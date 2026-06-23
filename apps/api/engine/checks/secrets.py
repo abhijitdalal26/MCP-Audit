@@ -4,22 +4,30 @@ from ..parser import MCPServer
 
 # (check_id, human title, compiled regex, severity)
 _VALUE_PATTERNS: list[tuple[str, str, re.Pattern, Severity]] = [
+    # SEC-001: AWS
     ("SEC-001", "AWS Access Key ID",
      re.compile(r'AKIA[0-9A-Z]{16}'), Severity.CRITICAL),
+    # SEC-002: VCS tokens
     ("SEC-002", "GitHub Personal Access Token",
      re.compile(r'ghp_[A-Za-z0-9]{36,}'), Severity.CRITICAL),
     ("SEC-002", "GitHub OAuth Token",
      re.compile(r'gho_[A-Za-z0-9]{36,}'), Severity.CRITICAL),
     ("SEC-002", "GitHub App Token",
      re.compile(r'ghs_[A-Za-z0-9]{36,}'), Severity.CRITICAL),
+    ("SEC-002", "GitHub Fine-Grained PAT",
+     re.compile(r'github_pat_[A-Za-z0-9_]{82,}'), Severity.CRITICAL),
     ("SEC-002", "GitLab Personal Access Token",
      re.compile(r'glpat-[A-Za-z0-9_-]{20,}'), Severity.CRITICAL),
+    # SEC-003: Database connection strings
     ("SEC-003", "PostgreSQL connection string with credentials",
      re.compile(r'postgres(?:ql)?://[^:@\s]+:[^@\s]+@'), Severity.CRITICAL),
     ("SEC-003", "MySQL connection string with credentials",
      re.compile(r'mysql://[^:@\s]+:[^@\s]+@'), Severity.CRITICAL),
     ("SEC-003", "MongoDB connection string with credentials",
      re.compile(r'mongodb(?:\+srv)?://[^:@\s]+:[^@\s]+@'), Severity.CRITICAL),
+    ("SEC-003", "Redis connection string with credentials",
+     re.compile(r'redis://:[^@\s]+@'), Severity.HIGH),
+    # SEC-004: API keys
     ("SEC-004", "OpenAI API key",
      re.compile(r'sk-(?:proj-)?[A-Za-z0-9_-]{40,}'), Severity.HIGH),
     ("SEC-004", "Anthropic API key",
@@ -28,8 +36,31 @@ _VALUE_PATTERNS: list[tuple[str, str, re.Pattern, Severity]] = [
      re.compile(r'sk_live_[A-Za-z0-9]{24,}'), Severity.HIGH),
     ("SEC-004", "Stripe live publishable key",
      re.compile(r'pk_live_[A-Za-z0-9]{24,}'), Severity.HIGH),
+    ("SEC-004", "Slack bot token",
+     re.compile(r'xoxb-[0-9A-Za-z-]{40,}'), Severity.HIGH),
+    ("SEC-004", "Slack OAuth token",
+     re.compile(r'xoxp-[0-9A-Za-z-]{40,}'), Severity.HIGH),
+    ("SEC-004", "Slack app-level token",
+     re.compile(r'xapp-[0-9A-Za-z-]{80,}'), Severity.HIGH),
+    ("SEC-004", "npm access token",
+     re.compile(r'npm_[A-Za-z0-9]{36,}'), Severity.HIGH),
+    ("SEC-004", "Hugging Face access token",
+     re.compile(r'hf_[A-Za-z0-9]{36,}'), Severity.HIGH),
+    ("SEC-004", "Replicate API token",
+     re.compile(r'r8_[A-Za-z0-9]{40,}'), Severity.HIGH),
+    ("SEC-004", "Firebase / GCP API key",
+     re.compile(r'AIza[0-9A-Za-z_-]{35}'), Severity.HIGH),
+    ("SEC-004", "Twilio Account SID",
+     re.compile(r'AC[a-zA-Z0-9]{32}'), Severity.HIGH),
+    ("SEC-004", "SendGrid API key",
+     re.compile(r'SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}'), Severity.HIGH),
+    ("SEC-004", "Shopify shared secret / access token",
+     re.compile(r'shp(?:ss|at|ca)_[a-fA-F0-9]{32}'), Severity.HIGH),
+    # SEC-005: JWT and signing keys
     ("SEC-005", "JWT token (encoded)",
      re.compile(r'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'), Severity.HIGH),
+    ("SEC-005", "SSH private key",
+     re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'), Severity.CRITICAL),
 ]
 
 # Env var names that suggest sensitive content (checked regardless of value pattern)
@@ -39,10 +70,18 @@ _SENSITIVE_VAR_NAMES: list[tuple[str, re.Pattern, Severity]] = [
     ("SEC-003", re.compile(r'(?i)(admin_password|root_password|sudo_password)'), Severity.CRITICAL),
     ("SEC-005", re.compile(r'(?i)(jwt_secret|signing_key|jwt_signing|secret_key|signing_secret)'), Severity.HIGH),
     ("SEC-004", re.compile(r'(?i)^(openai_api_key|anthropic_api_key|stripe_secret_key|stripe_sk)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(slack_bot_token|slack_token|slack_oauth_token|slack_signing_secret)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(npm_token|npm_auth_token)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(hf_token|hugging_face_hub_token|huggingface_token)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(replicate_api_token|replicate_api_key)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(firebase_api_key|firebase_service_account)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(twilio_auth_token|twilio_account_sid)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(sendgrid_api_key)$'), Severity.HIGH),
+    ("SEC-004", re.compile(r'(?i)^(shopify_access_token|shopify_api_secret)$'), Severity.HIGH),
 ]
 
 _PLACEHOLDER_RE = re.compile(
-    r'^\s*(\$\{[^}]+\}|<[^>]+>|your[-_\s].+|xxx+|placeholder|changeme|todo|example)\s*$',
+    r'^\s*(\$\{[^}]+\}|<[^>]+>|your[-_\s].+|xxx+|placeholder|changeme|todo|example|insert[-_]here|replace[-_]me)\s*$',
     re.I,
 )
 
@@ -142,11 +181,10 @@ def check_secrets(server: MCPServer) -> list[Finding]:
 def _is_package_arg(arg: str) -> bool:
     if arg.startswith("-"):
         return False
-    return arg.startswith("@") or ("/" not in arg and not arg.startswith("/"))
+    return arg.startswith("@") or ("/" not in arg and not arg.startswith("/") and not arg.startswith("C:\\"))
 
 
 def _is_pinned(arg: str) -> bool:
     if arg.startswith("@"):
-        # @scope/pkg@version has 2+ '@' chars
         return arg.count("@") >= 2
     return "@" in arg

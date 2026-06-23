@@ -8,6 +8,8 @@ from .checks import (
     check_tool_poisoning,
     check_privilege,
     check_shadow,
+    check_code_execution,
+    check_osv,
 )
 
 _SEVERITY_ORDER: dict[Severity, int] = {
@@ -23,16 +25,20 @@ def scan(config: MCPConfig) -> ScanResult:
     all_findings: list[Finding] = []
 
     for server in config.servers:
+        # Core static checks (fast, no network)
         all_findings.extend(check_secrets(server))
         all_findings.extend(check_supply_chain(server))
         all_findings.extend(check_tool_poisoning(server))
         all_findings.extend(check_privilege(server))
         all_findings.extend(check_shadow(server))
+        all_findings.extend(check_code_execution(server))
+        # Network check (OSV.dev) — may add latency, fails gracefully if unavailable
+        all_findings.extend(check_osv(server))
 
     # AT-001: Systemic absence of version pinning across the entire config
     if len(config.servers) >= 2:
-        pinned = sum(1 for s in config.servers if _any_pinned(s))
-        if pinned == 0:
+        pinned_count = sum(1 for s in config.servers if _any_pinned(s))
+        if pinned_count == 0:
             all_findings.append(Finding(
                 check_id="AT-001",
                 title="No version pinning across any configured server",

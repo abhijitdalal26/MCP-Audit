@@ -2,24 +2,39 @@ import re
 from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
 
-# Confirmed malicious or spoofed package names
+# Confirmed malicious, spoofed, or compromised packages
+# Sources: tooltrust AS-008, ox.security advisory (Apr 2026), community reports
 KNOWN_MALICIOUS: set[str] = {
+    # Confirmed spoofed/fake
     "mcp-server-free",
-    "modelcontextprotocl",
+    "modelcontextprotocl",           # missing 'o' in protocol
     "modelcontextprotocol-free",
-    "mcp-filesystem-server",  # spoofed (real: @modelcontextprotocol/server-filesystem)
+    "mcp-filesystem-server",         # spoofs @modelcontextprotocol/server-filesystem
+
+    # April 2026 supply chain attack wave (tooltrust AS-008)
+    "litellm",                       # compromised via account takeover — verify current safe version
+    "trivy",                         # npm typosquat of Aqua Security Go binary
 }
+
+# Packages that were compromised but are now patched — flag if an old version is pinned
+# Format: (package_name, set_of_bad_versions, remediation_hint)
+COMPROMISED_VERSIONS: list[tuple[str, set[str], str]] = [
+    # Add as specific compromised versions are documented
+    # ("langflow", {"1.0.0", "1.0.1"}, "Upgrade to >=1.1.0"),
+]
 
 # Typosquatting detection patterns
 _TYPOSQUAT_PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r'@modelcontextprotoc[^o]l/', re.I), "missing 'o' in 'protocol'"),
+    (re.compile(r'@modelcontextprotoc(?!ol/)', re.I), "missing/altered 'ol' in 'protocol'"),
     (re.compile(r'@modelcontextprot0col/', re.I), "zero replacing 'o' in 'protocol'"),
     (re.compile(r'@m0delcontextprotocol/', re.I), "zero replacing 'o' in 'model'"),
     (re.compile(r'mcp-serv[e3]r-', re.I), "leet-speak substitution in 'server'"),
     (re.compile(r'@modelc0ntextprotocol/', re.I), "zero replacing 'o' in 'context'"),
+    (re.compile(r'@modelcontexptrotocol/', re.I), "transposed letters in 'context'"),
+    (re.compile(r'@modelcontextprotocol\.', re.I), "dot instead of slash after scope"),
 ]
 
-# Trusted scopes — everything else gets flagged as unverified (SC-003)
+# Trusted scopes — everything else flagged as unverified (SC-003)
 _TRUSTED_SCOPES: set[str] = {
     "@modelcontextprotocol",
     "@anthropic",
@@ -34,6 +49,15 @@ def _extract_package(server: MCPServer) -> str | None:
     return None
 
 
+def _base_package_name(package: str) -> str:
+    """Strip version pin to get base name."""
+    if package.startswith("@"):
+        parts = package.split("@")
+        # @scope/pkg@version → @scope/pkg
+        return "@" + parts[1].split("/")[0] + "/" + "@".join(parts[1].split("/")[1:]).split("@")[0] if "/" in parts[1] else "@" + parts[1]
+    return package.split("@")[0]
+
+
 def check_supply_chain(server: MCPServer) -> list[Finding]:
     findings: list[Finding] = []
     package = _extract_package(server)
@@ -41,28 +65,30 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
     if not package:
         return findings
 
-    pkg_lower = package.lower().split("@")[0] if not package.startswith("@") else package.lower()
+    base = _base_package_name(package).lower()
 
-    # SC-001: Known malicious package
-    base_name = package.split("@")[0] if not package.startswith("@") else "/".join(package.split("/")[:2])
-    if base_name.lower() in KNOWN_MALICIOUS or pkg_lower in KNOWN_MALICIOUS:
+    # SC-001: Known malicious / compromised package
+    if base in KNOWN_MALICIOUS or package.lower().split("@")[0] in KNOWN_MALICIOUS:
         findings.append(Finding(
             check_id="SC-001",
-            title=f"Known malicious package: `{package}`",
+            title=f"Known malicious or compromised package: `{package}`",
             detail=(
-                f"Server `{server.name}` installs `{package}`, which is flagged as a known malicious "
-                "or confirmed typosquatted package. This package should not be run."
+                f"Server `{server.name}` installs `{package}`, which is flagged as known malicious, "
+                "confirmed typosquatted, or part of a supply chain attack. "
+                "(Sources: tooltrust AS-008 embedded blocklist, Ox.Security advisory April 2026)"
             ),
             severity=Severity.CRITICAL,
             owasp=OWASPCategory.MCP04,
             server_name=server.name,
             remediation=(
                 "Remove this server from your config immediately. "
-                "Find the official package at registry.modelcontextprotocol.io."
+                "Find the official equivalent at registry.modelcontextprotocol.io. "
+                "If this is `litellm` or `trivy`, verify you are using the official distribution "
+                "channel (pip install litellm from PyPI, not npm)."
             ),
             engine="custom",
         ))
-        return findings  # No point running further checks on a known-bad package
+        return findings  # No further supply-chain checks on confirmed bad packages
 
     # SC-002: Typosquatting detection
     for pattern, reason in _TYPOSQUAT_PATTERNS:
@@ -84,7 +110,7 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
                 ),
                 engine="custom",
             ))
-            break  # One typosquat finding per server is enough
+            break
 
     # SC-003: Unverified package scope
     if package.startswith("@"):

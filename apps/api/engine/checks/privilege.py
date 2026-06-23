@@ -26,6 +26,18 @@ _DB_ENV_RE = re.compile(r'(?i)(database_url|db_url|postgres_url|mysql_url|connec
 _WRITE_SERVER_RE = re.compile(r'(?i)(write|insert|update|delete|admin|migrate)')
 
 
+def _is_broad_path(arg: str, broad: str) -> bool:
+    """True only if the path IS the broad path or at most 1 level deeper (e.g. /Users/me but not /Users/me/projects)."""
+    if arg == broad:
+        return True
+    sep = "/" if "/" in broad else "\\"
+    if arg.startswith(broad + sep) or arg.startswith(broad + ("/" if sep == "\\" else "\\")):
+        broad_depth = len(broad.replace("\\", "/").rstrip("/").split("/"))
+        arg_depth = len(arg.replace("\\", "/").rstrip("/").split("/"))
+        return arg_depth <= broad_depth + 1
+    return False
+
+
 def check_privilege(server: MCPServer) -> list[Finding]:
     findings: list[Finding] = []
 
@@ -33,7 +45,7 @@ def check_privilege(server: MCPServer) -> list[Finding]:
     if server.command in ("npx", "node", "uvx", "python", "python3"):
         for arg in server.args:
             for broad in _BROAD_PATHS:
-                if arg == broad or arg.startswith(broad + "/") or arg.startswith(broad + "\\"):
+                if _is_broad_path(arg, broad):
                     findings.append(Finding(
                         check_id="PE-001",
                         title=f"Over-broad filesystem path: `{arg}`",
