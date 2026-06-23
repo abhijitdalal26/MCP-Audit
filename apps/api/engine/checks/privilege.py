@@ -14,6 +14,24 @@ _WIN_DRIVE_ROOT_RE = re.compile(r'^[A-Za-z]:[/\\]?$')
 # Commands that can invoke filesystem/JS/Python servers (by basename without extension)
 _EXEC_BASENAMES = {"npx", "node", "uvx", "uv", "python", "python3", "deno", "bun"}
 
+# Docker dangerous flags: flag_or_prefix → description of risk
+# Covers both --flag=value and --flag value forms
+_DOCKER_DANGER_FLAGS: dict[str, str] = {
+    "--privileged": "grants full host root access — all host devices + capabilities (equivalent to running as root on the host)",
+    "--cap-add=all": "grants ALL Linux capabilities — equivalent to root on the container's namespace",
+    "--network=host": "bypasses network isolation — container shares host network stack, can bind any host port",
+    "--pid=host": "shares host PID namespace — container can observe/signal all host processes",
+    "--ipc=host": "shares host IPC namespace — access to all host inter-process communication resources",
+    "--security-opt=no-new-privileges=false": "allows privilege escalation via SUID binaries inside the container",
+    "--userns=host": "disables user namespace isolation — container root is host root",
+}
+
+# Sensitive host paths that should not be volume-mounted into containers
+_DOCKER_SENSITIVE_MOUNT_PATHS: list[str] = [
+    "/", "/etc", "/root", "/proc", "/sys", "/dev", "/run", "/boot",
+    "/lib", "/lib64", "/usr", "/var/run", "/var/run/docker.sock",
+]
+
 
 def _is_node_like_command(cmd: str | None) -> bool:
     """True if command is a known script-runner, accepting full paths like /usr/bin/node."""
@@ -171,5 +189,82 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                         ),
                         engine="custom",
                     ))
+
+    # PE-005: Docker privilege escalation
+    # MCP servers running via Docker can break container isolation if dangerous flags are passed.
+    # Corpus: terminal_server uses docker run — these flags could appear in real configs.
+    _docker_cmd = os.path.basename(server.command or "").lower().rstrip(".exe")
+    if _docker_cmd == "docker":
+        args_lower = [a.lower() for a in server.args]
+        args_joined = " ".join(args_lower)
+
+        # Check for dangerous runtime flags
+        for flag, risk_description in _DOCKER_DANGER_FLAGS.items():
+            # Match --flag or --flag=... or (for two-word forms) --flag value
+            if flag in args_joined or any(a.startswith(flag.split("=")[0] + "=") for a in args_lower):
+                findings.append(Finding(
+                    check_id="PE-005",
+                    title=f"Docker container with dangerous privilege flag: `{flag}`",
+                    detail=(
+                        f"Server `{server.name}` runs a Docker container with the `{flag}` flag: "
+                        f"{risk_description}. "
+                        "Dangerous Docker flags break the isolation between the container and the host, "
+                        "allowing an MCP server to access host files, processes, or gain root-equivalent "
+                        "capabilities — defeating the purpose of containerization."
+                    ),
+                    severity=Severity.CRITICAL,
+                    owasp=OWASPCategory.MCP05,
+                    server_name=server.name,
+                    remediation=(
+                        f"Remove `{flag}` from the Docker run command. "
+                        "Run the container without privileged access and with a minimal set of capabilities. "
+                        "Use `--cap-drop=ALL --cap-add=<only-what-you-need>` for fine-grained control."
+                    ),
+                    engine="custom",
+                    attack_tactic="privilege-escalation",
+                    cwe_id="CWE-250",
+                ))
+                break  # One PE-005 per server is sufficient for the flag check
+
+        # Check for sensitive host volume mounts (-v /etc:/... or --mount source=/etc,...)
+        seen_pe5_mount = False
+        for i, arg in enumerate(server.args):
+            if seen_pe5_mount:
+                break
+            # -v flag: next arg is the mount spec, or --volume=spec
+            if arg in ("-v", "--volume") and i + 1 < len(server.args):
+                mount_spec = server.args[i + 1]
+            elif arg.startswith(("--volume=", "-v=")):
+                mount_spec = arg.split("=", 1)[1]
+            elif arg.startswith("--mount"):
+                mount_spec = arg
+            else:
+                continue
+            # Extract host path (before the colon in "hostpath:containerpath[:options]")
+            raw = mount_spec.split(":")[0]
+            host_path = raw.rstrip("/") or "/"  # preserve "/" if stripping leaves empty
+            if any(host_path == p or host_path.startswith(p + "/") for p in _DOCKER_SENSITIVE_MOUNT_PATHS):
+                seen_pe5_mount = True
+                findings.append(Finding(
+                    check_id="PE-005",
+                    title=f"Docker container mounts sensitive host path: `{host_path}`",
+                    detail=(
+                        f"Server `{server.name}` mounts `{host_path}` from the host into the container. "
+                        "This gives the containerized MCP server read/write access to sensitive host files. "
+                        "Mounting `/etc` exposes credentials; `/` exposes everything; "
+                        "`/var/run/docker.sock` gives the container control over the Docker daemon itself."
+                    ),
+                    severity=Severity.CRITICAL,
+                    owasp=OWASPCategory.MCP05,
+                    server_name=server.name,
+                    remediation=(
+                        f"Replace the host mount `{host_path}:...` with a specific subdirectory "
+                        "containing only the files this server actually needs. "
+                        "Never mount system directories, /etc, /root, or the Docker socket into MCP containers."
+                    ),
+                    engine="custom",
+                    attack_tactic="privilege-escalation",
+                    cwe_id="CWE-732",
+                ))
 
     return findings

@@ -285,6 +285,125 @@ class TestAT004NeighborJack:
         assert at4[0].attack_tactic == "initial-access"
 
 
+class TestPE005DockerPrivilegeEscalation:
+    """PE-005: Docker containers with dangerous flags or sensitive host volume mounts."""
+
+    def test_privileged_flag_flagged(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "-i", "--rm", "--privileged", "ubuntu", "bash"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe5 = [f for f in findings if f.check_id == "PE-005"]
+        assert len(pe5) >= 1
+        assert pe5[0].severity == Severity.CRITICAL
+
+    def test_network_host_flagged(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "--network=host", "my-mcp-image"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-005" for f in findings)
+
+    def test_root_volume_mount_flagged(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "-v", "/:/host", "ubuntu"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe5 = [f for f in findings if f.check_id == "PE-005"]
+        assert len(pe5) >= 1
+        assert pe5[0].severity == Severity.CRITICAL
+
+    def test_etc_volume_mount_flagged(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "-v", "/etc:/host-etc", "ubuntu"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-005" for f in findings)
+
+    def test_docker_sock_mount_flagged(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "-v", "/var/run/docker.sock:/var/run/docker.sock", "ubuntu"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-005" for f in findings)
+
+    def test_safe_docker_not_flagged(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "-i", "--rm", "-v", "/home/user/projects:/workspace", "mcp-image"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-005" for f in findings)
+
+    def test_non_docker_command_not_flagged(self):
+        server = MCPServer(
+            name="node-server",
+            command="node",
+            args=["server.js", "--privileged"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-005" for f in findings)
+
+    def test_cwe_250_on_pe005_flag(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "--privileged", "ubuntu"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe5 = [f for f in findings if f.check_id == "PE-005"]
+        assert pe5[0].cwe_id == "CWE-250"
+
+    def test_owasp_mcp05_on_pe005(self):
+        server = MCPServer(
+            name="docker-server",
+            command="docker",
+            args=["run", "--privileged", "ubuntu"],
+        )
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe5 = [f for f in findings if f.check_id == "PE-005"]
+        assert pe5[0].owasp.value == "MCP05"
+
+    def test_corpus_terminal_server_docker_pattern(self):
+        """Real-world pattern: docker run -i --rm with workspace volume (should be safe)."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "terminal_server": {
+                    "command": "docker",
+                    "args": [
+                        "run", "-i", "--rm",
+                        "-v", "/Users/user/mcp/workspace:/workspace",
+                        "mcp-terminal-image",
+                    ],
+                }
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        check_ids = {f.check_id for f in result.findings}
+        assert "PE-005" not in check_ids
+
+
 class TestCweIdOnFindingModel:
     """cwe_id field is optional on Finding and appears in scan results."""
 
