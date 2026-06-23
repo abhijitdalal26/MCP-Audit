@@ -12,6 +12,7 @@ from .checks import (
     check_osv,
     check_audit,
     check_lifecycle,
+    check_config_level,
 )
 
 _SEVERITY_ORDER: dict[Severity, int] = {
@@ -25,19 +26,27 @@ _SEVERITY_ORDER: dict[Severity, int] = {
 
 def scan(config: MCPConfig) -> ScanResult:
     all_findings: list[Finding] = []
+    # Collect per-server findings so config-level checks can cross-reference them
+    per_server: dict[str, list[Finding]] = {}
 
     for server in config.servers:
-        # Core static checks (fast, no network)
-        all_findings.extend(check_secrets(server))
-        all_findings.extend(check_supply_chain(server))
-        all_findings.extend(check_tool_poisoning(server))
-        all_findings.extend(check_privilege(server))
-        all_findings.extend(check_shadow(server))
-        all_findings.extend(check_code_execution(server))
-        all_findings.extend(check_audit(server))
-        all_findings.extend(check_lifecycle(server))
+        server_findings: list[Finding] = []
+        server_findings.extend(check_secrets(server))
+        server_findings.extend(check_supply_chain(server))
+        server_findings.extend(check_tool_poisoning(server))
+        server_findings.extend(check_privilege(server))
+        server_findings.extend(check_shadow(server))
+        server_findings.extend(check_code_execution(server))
+        server_findings.extend(check_audit(server))
+        server_findings.extend(check_lifecycle(server))
         # Network check (OSV.dev) — may add latency, fails gracefully if unavailable
-        all_findings.extend(check_osv(server))
+        server_findings.extend(check_osv(server))
+
+        per_server[server.name] = server_findings
+        all_findings.extend(server_findings)
+
+    # Config-level cross-server checks
+    all_findings.extend(check_config_level(config, per_server))
 
     # AT-001: Systemic absence of version pinning across the entire config
     if len(config.servers) >= 2:
