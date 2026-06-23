@@ -5,6 +5,7 @@ from .privilege import check_privilege
 from .shadow import check_shadow
 from .code_execution import check_code_execution
 from .osv_lookup import check_osv
+from .audit import check_audit
 
 __all__ = [
     "check_secrets",
@@ -14,4 +15,5 @@ __all__ = [
     "check_shadow",
     "check_code_execution",
     "check_osv",
+    "check_audit",
 ]

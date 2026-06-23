@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
+from typing import Optional
 
 
 class Severity(str, Enum):
@@ -36,6 +37,19 @@ OWASP_NAMES: dict[str, str] = {
     "MCP10": "Context Injection & Over-Sharing",
 }
 
+# MITRE ATT&CK tactic tags — used for enterprise reporting
+ATTACK_TACTICS = {
+    "initial-access": "Initial Access",
+    "credential-access": "Credential Access",
+    "privilege-escalation": "Privilege Escalation",
+    "execution": "Execution",
+    "persistence": "Persistence",
+    "defense-evasion": "Defense Evasion",
+    "collection": "Collection",
+    "exfiltration": "Exfiltration",
+    "impact": "Impact",
+}
+
 
 class Finding(BaseModel):
     check_id: str
@@ -46,6 +60,8 @@ class Finding(BaseModel):
     server_name: str
     remediation: str
     engine: str = "custom"
+    # Optional ATT&CK tactic for enterprise report correlation
+    attack_tactic: Optional[str] = None
 
 
 class ScanSummary(BaseModel):

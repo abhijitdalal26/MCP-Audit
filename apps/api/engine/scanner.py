@@ -10,6 +10,7 @@ from .checks import (
     check_shadow,
     check_code_execution,
     check_osv,
+    check_audit,
 )
 
 _SEVERITY_ORDER: dict[Severity, int] = {
@@ -32,6 +33,7 @@ def scan(config: MCPConfig) -> ScanResult:
         all_findings.extend(check_privilege(server))
         all_findings.extend(check_shadow(server))
         all_findings.extend(check_code_execution(server))
+        all_findings.extend(check_audit(server))
         # Network check (OSV.dev) — may add latency, fails gracefully if unavailable
         all_findings.extend(check_osv(server))
 
