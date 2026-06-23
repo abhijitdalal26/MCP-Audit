@@ -101,6 +101,20 @@ class TestCorpusNoCrash:
         check_ids = {f.check_id for f in result.findings}
         assert len(result.findings) >= 0  # at minimum: no crash
 
+    def test_synthetic_adversarial_multi_vector(self):
+        """Synthetic worst-case config exercises SEC-007, EX-003, CL-003, PE-006, DX-001, PI-001."""
+        result = _scan_and_snapshot("synthetic_adversarial.json")
+        check_ids = {f.check_id for f in result.findings}
+        # Must catch at minimum: SEC-001 (AWS key), EX-003 (curl|bash or PS encoded),
+        # SEC-007 (metadata endpoint), PI-001 (injection in env), PE-006 (sudo), DX-001 (BCC)
+        assert "SEC-001" in check_ids, "AWS key in env var must be caught"
+        assert "EX-003" in check_ids, "PowerShell encoded command or curl|bash must be caught"
+        assert "SEC-007" in check_ids, "Cloud metadata endpoint URL must be caught"
+        assert "PI-001" in check_ids, "Prompt injection phrase in env var must be caught"
+        assert "PE-006" in check_ids, "sudo as command must be caught"
+        assert "DX-001" in check_ids, "BCC exfiltration env var must be caught"
+        assert result.summary.risk_grade == "F", "Adversarial config must grade as F"
+
 
 class TestCorpusFindings:
     """Assert specific expected security findings in real configs."""

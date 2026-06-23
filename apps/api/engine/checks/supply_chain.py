@@ -1,8 +1,9 @@
 import re
+import os
 from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
 
-# Confirmed malicious, spoofed, or compromised packages
+# Confirmed malicious, spoofed, or compromised packages (any runtime)
 # Sources: tooltrust AS-008, ox.security advisory (Apr 2026), Trend Micro MCP CVEs, community reports
 KNOWN_MALICIOUS: set[str] = {
     # Confirmed spoofed/fake
@@ -11,10 +12,6 @@ KNOWN_MALICIOUS: set[str] = {
     "modelcontextprotocol-free",
     "mcp-filesystem-server",         # spoofs @modelcontextprotocol/server-filesystem
 
-    # April 2026 supply chain attack wave (tooltrust AS-008)
-    "litellm",                       # compromised via npm account takeover — verify using pip/PyPI
-    "trivy",                         # npm typosquat of Aqua Security Go binary (legitimate = github release)
-
     # Known malicious MCP-specific packages (sourced from Trend Micro / Ox Security)
     "mcp-server-free-filesystem",    # typosquat of official filesystem server
     "claude-mcp-server",             # impersonation package not from Anthropic
@@ -22,6 +19,15 @@ KNOWN_MALICIOUS: set[str] = {
     "mcp-tool-helper",               # generic impersonation pattern
     "mcp-server-helper",             # generic impersonation pattern
     "free-mcp-server",               # generic impersonation pattern
+}
+
+# Packages that are malicious ONLY on specific runtimes (disambiguated by command).
+# e.g., "litellm" on npm is a supply chain attack; on PyPI via uvx it is legitimate.
+KNOWN_MALICIOUS_BY_RUNTIME: dict[str, set[str]] = {
+    # npm-only malicious: these package names exist legitimately on other registries but were
+    # compromised via npm account takeover (tooltrust AS-008, April 2026 supply chain wave)
+    "npx": {"litellm", "trivy"},
+    "npm": {"litellm", "trivy"},
 }
 
 # Packages that were compromised but are now patched — flag if an old version is pinned
@@ -73,8 +79,13 @@ _TRUSTED_SCOPES: set[str] = {
 }
 
 
+def _cmd_basename(server: MCPServer) -> str:
+    return os.path.basename(server.command or "").lower().split(".")[0]
+
+
 def _extract_package(server: MCPServer) -> str | None:
-    if server.command in ("npx", "npm", "uvx"):
+    cmd = _cmd_basename(server)
+    if cmd in ("npx", "npm", "uvx"):
         for arg in server.args:
             if not arg.startswith("-"):
                 return arg
@@ -98,9 +109,11 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
         return findings
 
     base = _base_package_name(package).lower()
+    cmd = _cmd_basename(server)
 
     # SC-001: Known malicious / compromised package
-    if base in KNOWN_MALICIOUS or package.lower().split("@")[0] in KNOWN_MALICIOUS:
+    runtime_blocklist = KNOWN_MALICIOUS_BY_RUNTIME.get(cmd, set())
+    if base in KNOWN_MALICIOUS or base in runtime_blocklist or package.lower().split("@")[0] in KNOWN_MALICIOUS:
         findings.append(Finding(
             check_id="SC-001",
             title=f"Known malicious or compromised package: `{package}`",

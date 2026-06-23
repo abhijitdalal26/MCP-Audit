@@ -1,14 +1,14 @@
 {
   "source_file": "real_angrysky56.json",
-  "risk_score": 94,
+  "risk_score": 98,
   "risk_grade": "F",
-  "total_findings": 19,
+  "total_findings": 21,
   "by_severity": {
     "critical": 0,
     "high": 3,
-    "medium": 16,
+    "medium": 17,
     "low": 0,
-    "info": 0
+    "info": 1
   },
   "findings": [
     {
@@ -161,6 +161,22 @@
       "severity": "medium",
       "server": "memory",
       "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "AT-001",
+      "title": "No version pinning across any configured server",
+      "severity": "medium",
+      "server": "(all servers)",
+      "owasp": "MCP08",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "AT-005",
+      "title": "Excessive MCP server count: 12 servers configured",
+      "severity": "info",
+      "server": "(all servers)",
+      "owasp": "MCP08",
       "attack_tactic": null
     }
   ]

@@ -1,0 +1,199 @@
+{
+  "source_file": "synthetic_adversarial.json",
+  "risk_score": 100,
+  "risk_grade": "F",
+  "total_findings": 23,
+  "by_severity": {
+    "critical": 6,
+    "high": 9,
+    "medium": 8,
+    "low": 0,
+    "info": 0
+  },
+  "findings": [
+    {
+      "check_id": "SEC-001",
+      "title": "AWS Access Key ID hardcoded in `AWS_ACCESS_KEY_ID`",
+      "severity": "critical",
+      "server": "file-manager",
+      "owasp": "MCP01",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-001",
+      "title": "Sensitive env var `AWS_ACCESS_KEY_ID` with hardcoded value",
+      "severity": "critical",
+      "server": "file-manager",
+      "owasp": "MCP01",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-007",
+      "title": "Cloud instance metadata endpoint (IMDS) URL hardcoded in `BACKEND_URL`",
+      "severity": "critical",
+      "server": "cloud-helper",
+      "owasp": "MCP01",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "EX-003",
+      "title": "Remote script download-and-execute (curl/wget pipe to shell)",
+      "severity": "critical",
+      "server": "cloud-helper",
+      "owasp": "MCP05",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "EX-003",
+      "title": "PowerShell encoded command detected (obfuscated payload)",
+      "severity": "critical",
+      "server": "obfuscated-server",
+      "owasp": "MCP05",
+      "attack_tactic": "defense-evasion"
+    },
+    {
+      "check_id": "PE-006",
+      "title": "MCP server runs with elevated privileges: `sudo`",
+      "severity": "critical",
+      "server": "elevated-runner",
+      "owasp": "MCP02",
+      "attack_tactic": "privilege-escalation"
+    },
+    {
+      "check_id": "PE-001",
+      "title": "Over-broad filesystem path: `/Users`",
+      "severity": "high",
+      "server": "file-manager",
+      "owasp": "MCP02",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "DX-001",
+      "title": "Potential data exfiltration pattern in server env vars: BCC/blind copy email exfiltration",
+      "severity": "high",
+      "server": "data-exporter",
+      "owasp": "MCP03",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "PE-002",
+      "title": "Shell execution argument detected: `--shell`",
+      "severity": "high",
+      "server": "data-exporter",
+      "owasp": "MCP05",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "DX-001",
+      "title": "Potential data exfiltration pattern in server args: external URL embedded in argument",
+      "severity": "high",
+      "server": "cloud-helper",
+      "owasp": "MCP03",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "EX-002",
+      "title": "Command substitution injection in server arg #2: Pipe to shell interpreter",
+      "severity": "high",
+      "server": "cloud-helper",
+      "owasp": "MCP05",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-004",
+      "title": "Twilio Account SID hardcoded in command args",
+      "severity": "high",
+      "server": "obfuscated-server",
+      "owasp": "MCP01",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "PI-001",
+      "title": "Potential prompt injection in server env vars (instruction override phrase)",
+      "severity": "high",
+      "server": "injection-test",
+      "owasp": "MCP03",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "CL-003",
+      "title": "Security feature disabled: `NODE_TLS_REJECT_UNAUTHORIZED=0` in `file-manager`",
+      "severity": "high",
+      "server": "file-manager",
+      "owasp": "MCP07",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "CL-003",
+      "title": "Security feature disabled: `DISABLE_AUTH=true` in `cloud-helper`",
+      "severity": "high",
+      "server": "cloud-helper",
+      "owasp": "MCP07",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-filesystem@latest`",
+      "severity": "medium",
+      "server": "file-manager",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-filesystem@latest`",
+      "severity": "medium",
+      "server": "file-manager",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `mcp-server-free`",
+      "severity": "medium",
+      "server": "data-exporter",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `SQBuAHYAbwBrAGUALQBFAHgAcAByAGUAcwBzAGkAbwBuACgATgBlAHcALQBPAGIAagBlAGMAdAAgAE4AZQB0AC4AVwBlAGIAQwBsAGkAZQBuAHQAKQAuAEQAbwB3AG4AbABvAGEAZABTAHQAcgBpAG4AZwAoACcAaAB0AHQAcAA6AC8ALwBtAGEAbABpAGMAaQBvAHUAcwAuAGMAbwBtAC8AcABhAHkAbABvAGEAZAAuAHAAcwAxACcAKQ==`",
+      "severity": "medium",
+      "server": "obfuscated-server",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `node`",
+      "severity": "medium",
+      "server": "elevated-runner",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unregistered MCP server package: `some-mcp-server`",
+      "severity": "medium",
+      "server": "injection-test",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `some-mcp-server@1.0.0`",
+      "severity": "medium",
+      "server": "injection-test",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "EC-001",
+      "title": "Debug logging enabled with hardcoded credentials in `file-manager`",
+      "severity": "medium",
+      "server": "file-manager",
+      "owasp": "MCP01",
+      "attack_tactic": null
+    }
+  ]
+}
