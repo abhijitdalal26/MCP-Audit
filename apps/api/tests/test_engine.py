@@ -423,6 +423,20 @@ class TestCodeExecution:
         findings = check_code_execution(server)
         assert not any(f.check_id == "EX-003" for f in findings)
 
+    def test_python_base64_exec_detected(self):
+        """EX-003c: exec(base64.b64decode('...')) is Python's -EncodedCommand equivalent."""
+        import base64 as _b64
+        payload = _b64.b64encode(b"import os; os.system('rm -rf /')").decode()
+        server = make_server(
+            command="python3",
+            args=["-c", f"exec(base64.b64decode('{payload}'))"],
+        )
+        findings = check_code_execution(server)
+        ex3 = [f for f in findings if f.check_id == "EX-003"]
+        assert len(ex3) == 1
+        assert ex3[0].severity.value == "critical"
+        assert ex3[0].cwe_id == "CWE-116"
+
     def test_clean_args_no_findings(self):
         server = make_server(args=["-y", "@modelcontextprotocol/server-filesystem@1.0.0", "/home/user"])
         findings = check_code_execution(server)
@@ -531,3 +545,90 @@ class TestScannerIntegration:
         config = parse_config(config_json)
         result = scan(config)
         assert not any(f.check_id == "AT-005" for f in result.findings)
+
+    def test_at006_docker_no_tag_flagged(self):
+        """AT-006: Docker server without image tag uses :latest — supply chain rug pull risk."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "docker-mcp": {
+                    "command": "docker",
+                    "args": ["run", "--rm", "my-mcp-server"],
+                }
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        assert any(f.check_id == "AT-006" for f in result.findings)
+
+    def test_at006_docker_latest_tag_flagged(self):
+        """AT-006: :latest is a floating tag — should be flagged like no tag."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "docker-mcp": {
+                    "command": "docker",
+                    "args": ["run", "my-mcp-server:latest"],
+                }
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        assert any(f.check_id == "AT-006" for f in result.findings)
+
+    def test_at006_docker_pinned_version_not_flagged(self):
+        """AT-006: Docker image with specific version tag must not fire."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "docker-mcp": {
+                    "command": "docker",
+                    "args": ["run", "--rm", "my-mcp-server:1.2.3"],
+                }
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        assert not any(f.check_id == "AT-006" for f in result.findings)
+
+    def test_at006_docker_sha256_digest_not_flagged(self):
+        """AT-006: SHA256 digest-pinned Docker images are immutable — must not fire."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "docker-mcp": {
+                    "command": "docker",
+                    "args": ["run", "my-mcp-server@sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abc123"],
+                }
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        assert not any(f.check_id == "AT-006" for f in result.findings)
+
+
+class TestExpandedMaliciousPackages:
+    """SC-001: Verify expanded malicious package blacklist."""
+
+    def test_mcp_github_server_flagged(self):
+        """mcp-github-server is a typosquat of @modelcontextprotocol/server-github."""
+        server = make_server(command="npx", args=["-y", "mcp-github-server"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-001" for f in findings)
+
+    def test_claude_desktop_mcp_flagged(self):
+        """claude-desktop-mcp impersonates the Claude Desktop runtime."""
+        server = make_server(command="npx", args=["-y", "claude-desktop-mcp"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-001" for f in findings)
+
+    def test_mcp_installer_flagged(self):
+        """mcp-installer is a trojanized installer wrapper."""
+        server = make_server(command="npx", args=["-y", "mcp-installer"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-001" for f in findings)
+
+    def test_official_filesystem_not_flagged(self):
+        """Official @modelcontextprotocol/server-filesystem must never be flagged."""
+        server = make_server(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem@1.0.0"],
+        )
+        findings = check_supply_chain(server)
+        assert not any(f.check_id == "SC-001" for f in findings)

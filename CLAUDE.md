@@ -4,7 +4,7 @@
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
 ## Current State (2026-06-23)
-- **Engine**: 48 check IDs across 11 modules, 283/283 tests passing
+- **Engine**: 49 check IDs across 11 modules, 292/292 tests passing
 - **Research**: 2 research threads complete in `research/` — see `research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js minimal UI with risk grade (A-F) display
@@ -70,7 +70,7 @@ cd apps/api
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
 
-# Tests (283/283)
+# Tests (292/292)
 .venv/Scripts/pytest tests/ -v
 
 # Frontend
@@ -78,7 +78,7 @@ cd apps/web
 npm install && npm run dev   # → http://localhost:3000
 ```
 
-## Security Check IDs (48 total)
+## Security Check IDs (49 total)
 All checks mapped to OWASP MCP Top 10:
 
 | Module | IDs | OWASP |
@@ -93,7 +93,7 @@ All checks mapped to OWASP MCP Top 10:
 | audit.py | AT-002–004 | MCP08 |
 | lifecycle.py | LF-001 | MCP04 |
 | config_level.py | CL-001–003, EC-001 (incl. TLS bypass, auth disable) | MCP02, MCP03, MCP01, MCP07 |
-| scanner.py | AT-001, AT-005 | MCP08 |
+| scanner.py | AT-001, AT-005, AT-006 (Docker image tag pinning) | MCP08, MCP04 |
 | chain_analysis.py | CHAIN-001–003 | MCP02 |
 
 Full check specs: documentaion/progress/builds_log.md (not in git — Obsidian vault)

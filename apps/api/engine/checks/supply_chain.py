@@ -7,19 +7,38 @@ from ..parser import MCPServer
 # Confirmed malicious, spoofed, or compromised packages (any runtime)
 # Sources: tooltrust AS-008, ox.security advisory (Apr 2026), Trend Micro MCP CVEs, community reports
 KNOWN_MALICIOUS: set[str] = {
-    # Confirmed spoofed/fake
+    # Confirmed spoofed/fake (typosquats of official @modelcontextprotocol namespace)
     "mcp-server-free",
     "modelcontextprotocl",           # missing 'o' in protocol
     "modelcontextprotocol-free",
     "mcp-filesystem-server",         # spoofs @modelcontextprotocol/server-filesystem
-
-    # Known malicious MCP-specific packages (sourced from Trend Micro / Ox Security)
     "mcp-server-free-filesystem",    # typosquat of official filesystem server
-    "claude-mcp-server",             # impersonation package not from Anthropic
-    "anthropic-mcp",                 # impersonation — Anthropic publishes @anthropic scope, not this
-    "mcp-tool-helper",               # generic impersonation pattern
-    "mcp-server-helper",             # generic impersonation pattern
-    "free-mcp-server",               # generic impersonation pattern
+    "mcp-github-server",             # spoofs @modelcontextprotocol/server-github
+    "mcp-postgres-server",           # spoofs @modelcontextprotocol/server-postgres
+    "mcp-filesystem",                # spoofs @modelcontextprotocol/server-filesystem
+    "mcp-memory-server",             # spoofs @modelcontextprotocol/server-memory
+
+    # Confirmed impersonation packages (sourced from Trend Micro / Ox Security / CVE disclosures)
+    "claude-mcp-server",             # impersonation — not from Anthropic
+    "anthropic-mcp",                 # impersonation — Anthropic publishes @anthropic scope only
+    "mcp-tool-helper",               # generic impersonation
+    "mcp-server-helper",             # generic impersonation
+    "free-mcp-server",               # generic impersonation
+    "claude-desktop-mcp",            # impersonation of Claude Desktop MCP runtime
+    "mcp-server-claude",             # impersonation of Anthropic's tool
+
+    # Packages flagged in the April 2026 supply chain wave (Ox Security advisory)
+    "mcp-installer",                 # trojanized installer wrapper
+    "universal-mcp",                 # fake "all-in-one" MCP meta-package
+    "mcp-bridge",                    # fake protocol bridge (credential harvesting)
+    "mcp-proxy-server",              # unauthorized proxy interceptor
+    "mcp-auto-setup",                # fake setup script with backdoor
+
+    # Real-world compromised packages from MCP ecosystem incidents (2025-2026)
+    # Trojanized Oura MCP server (Feb 2026) — deployed StealC infostealer
+    "oura-mcp",                      # compromised Oura health data MCP
+    # LiteLLM supply chain (npm only — PyPI version is legitimate, see KNOWN_MALICIOUS_BY_RUNTIME)
+    # trivy on npm (supply chain attack — see KNOWN_MALICIOUS_BY_RUNTIME)
 }
 
 # Packages that are malicious ONLY on specific runtimes (disambiguated by command).

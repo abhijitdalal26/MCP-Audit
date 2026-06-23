@@ -184,4 +184,49 @@ def check_code_execution(server: MCPServer) -> list[Finding]:
                 cwe_id="CWE-494",
             ))
 
+    # EX-003c: Python base64 decode-and-execute (obfuscated Python payload)
+    # Analogous to EX-003a (PowerShell -EncodedCommand) but for Python.
+    # Pattern: exec(base64.b64decode('PAYLOAD')) or eval(base64.b64decode(...))
+    # Decode and show a preview in the finding, just like EX-003a.
+    _PY_B64_EXEC_RE = re.compile(
+        r'(?:exec|eval)\s*\(\s*(?:base64\.b64decode|__import__\(["\']base64["\']\)'
+        r'\.b64decode|codecs\.decode)\s*\(\s*["\']([A-Za-z0-9+/]{20,}={0,2})["\']',
+        re.I,
+    )
+    for arg in server.args:
+        m = _PY_B64_EXEC_RE.search(arg)
+        if m:
+            b64_payload = m.group(1)
+            try:
+                decoded = base64.b64decode(b64_payload).decode("utf-8", errors="replace")[:80]
+            except Exception:
+                decoded = b64_payload[:80]
+            key = f"EX-003:pyb64:{server.name}"
+            if key not in seen:
+                seen.add(key)
+                findings.append(Finding(
+                    check_id="EX-003",
+                    title="Python base64 decode-and-execute detected (obfuscated payload)",
+                    detail=(
+                        f"Server `{server.name}` contains a `exec(base64.b64decode(...))` pattern "
+                        "— the Python equivalent of PowerShell -EncodedCommand. "
+                        f"Decoded payload preview: `{decoded!r}`. "
+                        "This is a classic payload obfuscation technique used to hide malicious "
+                        "Python code from static scanners. No legitimate MCP server config "
+                        "requires runtime base64 decoding of executable code."
+                    ),
+                    severity=Severity.CRITICAL,
+                    owasp=OWASPCategory.MCP05,
+                    server_name=server.name,
+                    remediation=(
+                        "Remove this server immediately. Decode the base64 payload manually "
+                        "(python3 -c \"import base64; print(base64.b64decode('<payload>').decode())\") "
+                        "to understand what it executes, then report to the package maintainer."
+                    ),
+                    engine="custom",
+                    attack_tactic="defense-evasion",
+                    cwe_id="CWE-116",
+                ))
+            break
+
     return findings

@@ -81,6 +81,43 @@ def scan(config: MCPConfig) -> ScanResult:
                 cwe_id="CWE-1104",
             ))
 
+    # AT-006: Docker server with unpinned image tag (supply chain rug pull risk)
+    # Like npm @latest, a Docker image without a specific tag or digest will silently
+    # pull a new version on every restart. A compromised image registry or image tag
+    # override gives attackers a silent code injection vector.
+    import os as _os
+    for server in config.servers:
+        cmd_base = _os.path.basename(server.command or "").lower()
+        if "." in cmd_base:
+            cmd_base = cmd_base.rsplit(".", 1)[0]
+        if cmd_base == "docker":
+            image = _extract_docker_image(server.args)
+            if image and not _docker_image_pinned(image):
+                all_findings.append(Finding(
+                    check_id="AT-006",
+                    title=f"Docker image without pinned tag: `{image}`",
+                    detail=(
+                        f"Server `{server.name}` uses Docker image `{image}` without a specific "
+                        "version tag or SHA digest. Without pinning, every restart can pull a "
+                        "different image version. An attacker who compromises the image registry "
+                        "or performs a tag-overwrite attack can silently replace the running MCP "
+                        "server code. Using `:latest` or no tag is equivalent to `@*` in npm — "
+                        "never reproducible, never auditable."
+                    ),
+                    severity=Severity.MEDIUM,
+                    owasp=OWASPCategory.MCP04,
+                    server_name=server.name,
+                    remediation=(
+                        f"Pin the image to a specific version tag or SHA digest: "
+                        f"`{image}:1.2.3` or `{image}@sha256:<digest>`. "
+                        "SHA digest pinning is stronger (tags are mutable; digests are not). "
+                        "Re-pin intentionally when you want to upgrade, not automatically."
+                    ),
+                    engine="custom",
+                    attack_tactic="initial-access",
+                    cwe_id="CWE-1104",
+                ))
+
     # AT-005: Excessive server count — each server is an independent entry point
     if n >= _AT005_HIGH_SERVER_THRESHOLD:
         all_findings.append(Finding(
@@ -114,6 +151,41 @@ def scan(config: MCPConfig) -> ScanResult:
         summary=_summarize(all_findings, n),
         scanned_at=datetime.now(timezone.utc).isoformat(),
     )
+
+
+def _extract_docker_image(args: list[str]) -> str | None:
+    """Extract Docker image name from `docker run` args (after all flags)."""
+    try:
+        run_idx = args.index("run")
+    except ValueError:
+        return None
+    i = run_idx + 1
+    while i < len(args):
+        arg = args[i]
+        if arg.startswith("-"):
+            # Skip flag and its value if needed
+            if arg in ("-e", "--env", "-v", "--volume", "--name", "-p", "--publish",
+                       "--network", "--user", "-u", "--entrypoint", "--workdir", "-w",
+                       "--label", "-l", "--runtime", "--platform", "--memory", "-m",
+                       "--cpus", "--add-host", "--dns", "--env-file"):
+                i += 2  # skip flag + value
+            else:
+                i += 1  # skip just the flag
+        else:
+            return arg  # first non-flag arg is the image
+    return None
+
+
+def _docker_image_pinned(image: str) -> bool:
+    """Return True if image has a specific version tag (not :latest, not untagged) or a sha256 digest."""
+    if "@sha256:" in image:
+        return True  # digest-pinned — immutable
+    if ":" not in image:
+        return False  # no tag = :latest
+    tag = image.rsplit(":", 1)[1]
+    if tag in ("latest", "stable", "edge", "main", "master", "dev", "development", "test", "prod"):
+        return False  # floating tags
+    return True  # specific version tag
 
 
 def _any_pinned(server) -> bool:

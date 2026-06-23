@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-283%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,7 +13,7 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**48 checks across 11 modules:**
+**49 checks across 11 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
@@ -28,7 +28,7 @@ Every MCP server you add to Claude Desktop or Cursor gets access to your filesys
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
 | `lifecycle.py` | LF-001 | Postinstall script abuse |
 | `config_level.py` | CL-001–003, EC-001 | Confused deputy, duplicate servers, security feature disable, debug log exposure |
-| `scanner.py` | AT-001, AT-005 | Version pinning audit, excessive server count |
+| `scanner.py` | AT-001, AT-005–006 | Version pinning audit, excessive server count, Docker image pinning |
 
 Every finding includes: severity, OWASP MCP Top 10 category, CWE ID, MITRE ATT&CK tactic, and remediation guidance.
 
@@ -98,7 +98,7 @@ apps/api/           FastAPI backend
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
     checks/         41 check implementations
-  tests/            283 tests (unit + property-based + real-world corpus)
+  tests/            292 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -126,7 +126,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 283 tests
+.venv/Scripts/pytest tests/ -v    # 292 tests
 
 # Frontend
 cd apps/web
