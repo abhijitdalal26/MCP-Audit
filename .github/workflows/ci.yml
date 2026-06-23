@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Placeholder — fill in as each app layer is built
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup complete
+        run: echo "CI pipeline ready — add app-specific steps as each layer is built"
