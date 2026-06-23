@@ -133,6 +133,29 @@ class TestPrivilege:
         findings = check_privilege(server)
         assert any(f.check_id == "PE-004" for f in findings)
 
+    def test_sudo_command_is_critical(self):
+        """PE-006: server.command = 'sudo' grants host-level root access."""
+        server = make_server(command="sudo", args=["node", "server.js"])
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-006" for f in findings)
+        pe6 = [f for f in findings if f.check_id == "PE-006"]
+        assert pe6[0].severity == Severity.CRITICAL
+
+    def test_su_command_detected(self):
+        server = make_server(command="/usr/bin/su", args=["-c", "node server.js", "root"])
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-006" for f in findings)
+
+    def test_sudo_in_args_detected(self):
+        server = make_server(command="bash", args=["-c", "sudo npm install && node server.js"])
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-006" for f in findings)
+
+    def test_normal_node_command_not_flagged(self):
+        server = make_server(command="node", args=["server.js"])
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-006" for f in findings)
+
 
 # ── Shadow Servers ────────────────────────────────────────────────────────────
 

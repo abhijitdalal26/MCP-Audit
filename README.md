@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-185%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-189%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,7 +13,7 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**40 checks across 10 modules:**
+**41 checks across 10 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
@@ -21,7 +21,7 @@ Every MCP server you add to Claude Desktop or Cursor gets access to your filesys
 | `supply_chain.py` | SC-001–003, SC-005 | Malicious/typosquatted packages, GitHub ref deps |
 | `osv_lookup.py` | SC-004 | Live CVE lookup via OSV.dev |
 | `tool_poisoning.py` | PI-001–004, DX-001 | Prompt injection, obfuscation, data exfiltration |
-| `privilege.py` | PE-001–005 | Overbroad filesystem, shell access, Docker privilege escalation |
+| `privilege.py` | PE-001–006 | Overbroad filesystem, shell access, Docker privilege, sudo/elevated commands |
 | `shadow.py` | SH-001–005 | Unregistered servers, HTTP, homoglyphs, auto-discovery |
 | `code_execution.py` | EX-001–003 | Inline code execution, command substitution, PowerShell encoded cmds, curl-pipe-bash |
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
@@ -96,8 +96,8 @@ apps/api/           FastAPI backend
     models.py       Pydantic models (Finding, ScanResult, ScanSummary)
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
-    checks/         40 check implementations
-  tests/            185 tests (unit + property-based + real-world corpus)
+    checks/         41 check implementations
+  tests/            189 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -125,7 +125,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 185 tests
+.venv/Scripts/pytest tests/ -v    # 189 tests
 
 # Frontend
 cd apps/web
@@ -141,7 +141,7 @@ All 10 categories covered:
 | Category | Description | Checks |
 |----------|-------------|--------|
 | MCP01 | Token Mismanagement & Secret Exposure | SEC-001–007, EC-001 |
-| MCP02 | Privilege Escalation via Scope Creep | PE-001–004, CL-001 |
+| MCP02 | Privilege Escalation via Scope Creep | PE-001–006, CL-001 |
 | MCP03 | Tool Poisoning | PI-001–004, DX-001, SH-004, CL-002 |
 | MCP04 | Supply Chain Attacks | SC-001–005, LF-001 |
 | MCP05 | Command Injection & Execution | EX-001–002, PE-005 |

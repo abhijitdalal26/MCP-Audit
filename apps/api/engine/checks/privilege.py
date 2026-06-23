@@ -49,6 +49,13 @@ _SHELL_KEYWORDS: list[str] = [
     "/bin/sh", "/bin/bash", "cmd.exe", "powershell.exe",
 ]
 
+# PE-006: Commands that run with elevated OS privileges
+# No legitimate MCP server should start as root/sudo — it grants host-level access
+_ELEVATED_CMD_BASENAMES = {"sudo", "su", "doas", "pkexec", "runas"}
+
+# Sudo/runas in args is also dangerous: e.g. bash args ["-c", "sudo rm -rf /"]
+_SUDO_IN_ARGS_RE = re.compile(r'(?:^|[\s;|&])(sudo|doas|pkexec)\s', re.I)
+
 _ADMIN_ENV_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("PE-003", re.compile(r'(?i)(sudo_password|root_token|root_password|admin_key|admin_password|admin_token)')),
     ("PE-003", re.compile(r'(?i)(master_key|super_admin|superuser_password|master_password)')),
@@ -266,5 +273,61 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                     attack_tactic="privilege-escalation",
                     cwe_id="CWE-732",
                 ))
+
+    # PE-006: Server command or args request elevated OS privileges (sudo/su/runas)
+    # No legitimate MCP server needs to start as sudo — grants full host control.
+    _cmd_base = os.path.basename(server.command or "").lower().split(".")[0]
+    if _cmd_base in _ELEVATED_CMD_BASENAMES:
+        findings.append(Finding(
+            check_id="PE-006",
+            title=f"MCP server runs with elevated privileges: `{server.command}`",
+            detail=(
+                f"Server `{server.name}` uses `{server.command}` as its command, requesting "
+                "elevated operating system privileges (root/admin). "
+                "Running an MCP server as sudo gives it unrestricted host access — "
+                "any tool poisoning, prompt injection, or supply chain attack against "
+                "this server would gain root-level execution capability."
+            ),
+            severity=Severity.CRITICAL,
+            owasp=OWASPCategory.MCP02,
+            server_name=server.name,
+            remediation=(
+                f"Remove `{server.command}` and run the MCP server under a regular user account. "
+                "If the server genuinely requires root access for a specific operation, "
+                "isolate that operation in a separate privileged process and grant only "
+                "the minimum required capability (e.g., `CAP_NET_BIND_SERVICE` for port 80, "
+                "not full root)."
+            ),
+            engine="custom",
+            attack_tactic="privilege-escalation",
+            cwe_id="CWE-250",
+        ))
+    else:
+        # Also check args for sudo usage inside shell commands
+        full_args_str = " ".join(server.args)
+        m = _SUDO_IN_ARGS_RE.search(full_args_str)
+        if m:
+            findings.append(Finding(
+                check_id="PE-006",
+                title=f"Privilege escalation via `{m.group(1)}` in server arguments",
+                detail=(
+                    f"Server `{server.name}` argument string contains `{m.group(1)}`, "
+                    "which would execute subsequent commands with elevated privileges. "
+                    "This is often used in post-install scripts or shell wrappers to "
+                    "silently escalate from user to root during MCP server execution."
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP02,
+                server_name=server.name,
+                remediation=(
+                    f"Remove the `{m.group(1)}` call from server arguments. "
+                    "MCP servers should operate entirely within user-level permissions. "
+                    "If a privileged operation is required, extract it into a separate, "
+                    "auditable process with minimal capabilities."
+                ),
+                engine="custom",
+                attack_tactic="privilege-escalation",
+                cwe_id="CWE-250",
+            ))
 
     return findings
