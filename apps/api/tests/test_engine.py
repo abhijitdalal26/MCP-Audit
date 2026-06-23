@@ -228,3 +228,43 @@ class TestScannerIntegration:
         config = parse_config(config_json)
         result = scan(config)
         assert any(f.check_id == "AT-001" for f in result.findings)
+
+    def test_at001_not_fires_when_dist_tag_pinned(self):
+        """@latest is NOT a real pin — AT-001 should still fire."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "a": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem@latest"]},
+                "b": {"command": "npx", "args": ["-y", "some-server@next"]},
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        assert any(f.check_id == "AT-001" for f in result.findings)
+
+    def test_at001_not_fires_when_semver_pinned(self):
+        """Exact semver pins prevent AT-001 from firing."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "a": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem@1.0.0"]},
+                "b": {"command": "npx", "args": ["-y", "some-server@2.3.1"]},
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        assert not any(f.check_id == "AT-001" for f in result.findings)
+
+    def test_at005_fires_for_high_server_count(self):
+        """AT-005: warn when config has 10+ servers."""
+        servers = {f"server-{i}": {"command": "npx", "args": ["-y", f"pkg-{i}"]} for i in range(10)}
+        config_json = json.dumps({"mcpServers": servers})
+        config = parse_config(config_json)
+        result = scan(config)
+        assert any(f.check_id == "AT-005" for f in result.findings)
+
+    def test_at005_not_fires_for_small_count(self):
+        """AT-005 should not fire for fewer than 10 servers."""
+        servers = {f"server-{i}": {"command": "npx", "args": ["-y", f"pkg-{i}"]} for i in range(5)}
+        config_json = json.dumps({"mcpServers": servers})
+        config = parse_config(config_json)
+        result = scan(config)
+        assert not any(f.check_id == "AT-005" for f in result.findings)

@@ -4,7 +4,7 @@
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
 ## Current State (2026-06-23)
-- **Engine**: 36 check IDs across 10 modules, 164/164 tests passing
+- **Engine**: 37 check IDs across 10 modules, 168/168 tests passing
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js minimal UI with risk grade (A-F) display
 - **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
@@ -68,7 +68,7 @@ cd apps/api
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
 
-# Tests (164/164)
+# Tests (168/168)
 .venv/Scripts/pytest tests/ -v
 
 # Frontend
@@ -91,7 +91,7 @@ All checks mapped to OWASP MCP Top 10:
 | audit.py | AT-002–004 | MCP08 |
 | lifecycle.py | LF-001 | MCP04 |
 | config_level.py | CL-001–002, EC-001 | MCP02, MCP03, MCP01 |
-| scanner.py | AT-001 | MCP08 |
+| scanner.py | AT-001, AT-005 | MCP08 |
 
 Full check specs: documentaion/progress/builds_log.md (not in git — Obsidian vault)
 
