@@ -280,4 +280,151 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
                 cwe_id="CWE-1007",
             ))
 
+    # SC-007: Custom npm/PyPI registry override (dependency confusion / Birsan-style attack)
+    # Alex Birsan 2021: uploading a higher-version package to a public registry that shadows
+    # an internal private registry package. MCP variant: the config overrides the registry
+    # to an attacker-controlled endpoint — every package install goes to the attacker's server.
+    # Source: Alex Birsan, "Dependency Confusion" (2021); NSA CSI on MCP security (2026).
+    _sc007_found = False
+    if cmd in ("npx", "npm"):
+        for i, arg in enumerate(server.args):
+            if arg == "--registry" and i + 1 < len(server.args):
+                registry_url = server.args[i + 1]
+                if not registry_url.startswith("https://registry.npmjs.org"):
+                    findings.append(Finding(
+                        check_id="SC-007",
+                        title=f"Custom npm registry override: `{registry_url}`",
+                        detail=(
+                            f"Server `{server.name}` passes `--registry {registry_url}` in its args. "
+                            "This redirects ALL npm package resolution to the specified registry "
+                            "instead of the official https://registry.npmjs.org. "
+                            "An attacker-controlled registry can serve malicious packages that "
+                            "shadow any package name, including official ones — with no warning to the user. "
+                            "(Attack: Alex Birsan dependency confusion, 2021)"
+                        ),
+                        severity=Severity.HIGH,
+                        owasp=OWASPCategory.MCP04,
+                        server_name=server.name,
+                        remediation=(
+                            f"Verify that `{registry_url}` is your organization's internal registry "
+                            "and that it applies strict package name validation to prevent dependency confusion. "
+                            "If you do not recognize this registry, remove the flag and use the official npm registry."
+                        ),
+                        engine="custom",
+                        attack_tactic="initial-access",
+                        cwe_id="CWE-829",
+                    ))
+                    _sc007_found = True
+                    break
+            elif arg.startswith("--registry="):
+                registry_url = arg.split("=", 1)[1]
+                if not registry_url.startswith("https://registry.npmjs.org"):
+                    findings.append(Finding(
+                        check_id="SC-007",
+                        title=f"Custom npm registry override: `{registry_url}`",
+                        detail=(
+                            f"Server `{server.name}` passes `{arg}` in its args. "
+                            "This redirects ALL npm package resolution to the specified registry "
+                            "instead of the official https://registry.npmjs.org. "
+                            "An attacker-controlled registry can serve malicious packages that "
+                            "shadow any package name, including official ones — with no warning to the user. "
+                            "(Attack: Alex Birsan dependency confusion, 2021)"
+                        ),
+                        severity=Severity.HIGH,
+                        owasp=OWASPCategory.MCP04,
+                        server_name=server.name,
+                        remediation=(
+                            f"Verify that `{registry_url}` is your organization's internal registry "
+                            "and that it applies strict package name validation to prevent dependency confusion. "
+                            "If you do not recognize this registry, remove the flag and use the official npm registry."
+                        ),
+                        engine="custom",
+                        attack_tactic="initial-access",
+                        cwe_id="CWE-829",
+                    ))
+                    _sc007_found = True
+                    break
+        if not _sc007_found:
+            for env_key, env_val in server.env.items():
+                if env_key.upper() in ("NPM_CONFIG_REGISTRY", "NPM_REGISTRY") and env_val:
+                    if not env_val.startswith("https://registry.npmjs.org"):
+                        findings.append(Finding(
+                            check_id="SC-007",
+                            title=f"Custom npm registry via env var `{env_key}`: `{env_val}`",
+                            detail=(
+                                f"Server `{server.name}` sets `{env_key}={env_val}`, "
+                                "overriding the default npm registry for all package operations. "
+                                "This is a common vector for dependency confusion attacks — "
+                                "all npm installs in this server's runtime will resolve against "
+                                "the specified registry instead of the official https://registry.npmjs.org."
+                            ),
+                            severity=Severity.HIGH,
+                            owasp=OWASPCategory.MCP04,
+                            server_name=server.name,
+                            remediation=(
+                                f"Verify that `{env_val}` is a trusted registry. "
+                                "Use Verdaccio or Nexus proxy registries with upstream mirroring rather "
+                                "than standalone registries to prevent dependency confusion attacks."
+                            ),
+                            engine="custom",
+                            attack_tactic="initial-access",
+                            cwe_id="CWE-829",
+                        ))
+                        break
+
+    # SC-007 (PyPI variant): alternative index override for uv/pip/uvx
+    if cmd in ("uv", "uvx", "pip", "pip3", "python"):
+        for i, arg in enumerate(server.args):
+            if arg in ("--index-url", "-i", "--extra-index-url") and i + 1 < len(server.args):
+                index_url = server.args[i + 1]
+                if "pypi.org" not in index_url.lower():
+                    findings.append(Finding(
+                        check_id="SC-007",
+                        title=f"Custom PyPI index override: `{index_url}`",
+                        detail=(
+                            f"Server `{server.name}` passes `{arg} {index_url}` in its args. "
+                            "This redirects Python package resolution to a custom index "
+                            "instead of the official https://pypi.org. "
+                            "A malicious custom index can return any content for any package name, "
+                            "enabling dependency confusion and supply chain attacks."
+                        ),
+                        severity=Severity.HIGH,
+                        owasp=OWASPCategory.MCP04,
+                        server_name=server.name,
+                        remediation=(
+                            f"Verify `{index_url}` is a trusted mirror or internal registry. "
+                            "Use `--extra-index-url` with the official PyPI as the primary index "
+                            "and enable `--index-strategy first-match` (uv) to prevent shadowing."
+                        ),
+                        engine="custom",
+                        attack_tactic="initial-access",
+                        cwe_id="CWE-829",
+                    ))
+                    break
+            elif arg.startswith("--index-url=") or arg.startswith("--extra-index-url="):
+                index_url = arg.split("=", 1)[1]
+                if "pypi.org" not in index_url.lower():
+                    findings.append(Finding(
+                        check_id="SC-007",
+                        title=f"Custom PyPI index override: `{index_url}`",
+                        detail=(
+                            f"Server `{server.name}` passes `{arg}` in its args. "
+                            "This redirects Python package resolution to a custom index. "
+                            "A malicious custom index can return any content for any package name, "
+                            "enabling dependency confusion and supply chain attacks."
+                        ),
+                        severity=Severity.HIGH,
+                        owasp=OWASPCategory.MCP04,
+                        server_name=server.name,
+                        remediation=(
+                            f"Verify the custom index URL is a trusted mirror. "
+                            "Use `--index-strategy first-match` (uv) to prevent PyPI packages "
+                            "from being shadowed by internal package names."
+                        ),
+                        engine="custom",
+                        attack_tactic="initial-access",
+                        cwe_id="CWE-829",
+                    ))
+                    break
+
     return findings

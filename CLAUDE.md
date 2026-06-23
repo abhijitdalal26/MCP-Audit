@@ -4,7 +4,7 @@
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
 ## Current State (2026-06-23)
-- **Engine**: 44 check IDs across 10 modules, 229/229 tests passing
+- **Engine**: 45 check IDs across 10 modules, 233/233 tests passing
 - **Research**: 2 research threads active in `research/` — see `research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js minimal UI with risk grade (A-F) display
@@ -24,7 +24,7 @@ apps/api/                  FastAPI backend
     cyclonedx.py           CycloneDX 1.6 AI-BOM output formatter
     checks/
       secrets.py           SEC-001–007 (includes HTTP basic auth + cloud metadata endpoint)
-      supply_chain.py      SC-001–003, SC-005–006 (uv run --with support, homoglyphs)
+      supply_chain.py      SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override)
       tool_poisoning.py    PI-001–005, DX-001 (both scan args + env var values)
       privilege.py         PE-001–006 (+ sudo/elevated command detection)
       shadow.py            SH-001–005
@@ -83,7 +83,7 @@ All checks mapped to OWASP MCP Top 10:
 | Module | IDs | OWASP |
 |---|---|---|
 | secrets.py | SEC-001–007 (incl. HTTP basic auth, IMDS endpoints) | MCP01, MCP04 |
-| supply_chain.py | SC-001–003, SC-005–006 (incl. uv run --with, homoglyphs) | MCP04 |
+| supply_chain.py | SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override) | MCP04 |
 | osv_lookup.py | SC-004 | MCP04 |
 | tool_poisoning.py | PI-001–005, DX-001 (incl. invisible Unicode, env var scan) | MCP03, MCP06 |
 | privilege.py | PE-001–007 (incl. sudo/elevated cmds, permission bypass) | MCP02, MCP05, MCP10 |

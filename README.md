@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-229%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-233%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,12 +13,12 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**44 checks across 10 modules:**
+**45 checks across 10 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
 | `secrets.py` | SEC-001–007 | Hardcoded credentials, API keys, tokens, HTTP basic auth, cloud metadata endpoints (SSRF/IMDS) |
-| `supply_chain.py` | SC-001–003, SC-005–006 | Malicious/typosquatted packages, GitHub ref deps, homoglyph package names, `uv run --with` |
+| `supply_chain.py` | SC-001–003, SC-005–007 | Malicious/typosquatted packages, GitHub ref deps, homoglyph names, registry override (Birsan attack) |
 | `osv_lookup.py` | SC-004 | Live CVE lookup via OSV.dev |
 | `tool_poisoning.py` | PI-001–005, DX-001 | Prompt injection, obfuscation, invisible Unicode, bidi overrides, data exfiltration |
 | `privilege.py` | PE-001–007 | Overbroad filesystem, shell access, Docker privilege, sudo, permission bypass flags |
@@ -97,7 +97,7 @@ apps/api/           FastAPI backend
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
     checks/         41 check implementations
-  tests/            229 tests (unit + property-based + real-world corpus)
+  tests/            233 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -125,7 +125,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 229 tests
+.venv/Scripts/pytest tests/ -v    # 233 tests
 
 # Frontend
 cd apps/web
@@ -143,7 +143,7 @@ All 10 categories covered:
 | MCP01 | Token Mismanagement & Secret Exposure | SEC-001–007, EC-001 |
 | MCP02 | Privilege Escalation via Scope Creep | PE-001–007, CL-001 |
 | MCP03 | Tool Poisoning | PI-001–004, DX-001, SH-004, CL-002 |
-| MCP04 | Supply Chain Attacks | SC-001–005, LF-001 |
+| MCP04 | Supply Chain Attacks | SC-001–007, LF-001 |
 | MCP05 | Command Injection & Execution | EX-001–002, PE-005 |
 | MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
 | MCP07 | Insufficient Authentication | SH-002, CL-003 |

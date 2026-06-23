@@ -64,6 +64,47 @@ class TestSupplyChain:
         findings = check_supply_chain(server)
         assert len(findings) == 0
 
+    def test_sc007_npm_registry_override_flag(self):
+        """SC-007: --registry flag pointing to custom server is dependency confusion risk."""
+        server = make_server(
+            command="npx",
+            args=["--registry=https://evil.corp/npm", "-y", "@scope/mcp-server"],
+        )
+        findings = check_supply_chain(server)
+        sc7 = [f for f in findings if f.check_id == "SC-007"]
+        assert len(sc7) == 1
+        assert "evil.corp" in sc7[0].title
+
+    def test_sc007_official_registry_not_flagged(self):
+        """SC-007: --registry pointing to official npmjs.org must not fire."""
+        server = make_server(
+            command="npx",
+            args=["--registry=https://registry.npmjs.org", "-y", "@scope/mcp-server"],
+        )
+        findings = check_supply_chain(server)
+        assert not any(f.check_id == "SC-007" for f in findings)
+
+    def test_sc007_npm_config_registry_env_var(self):
+        """SC-007: NPM_CONFIG_REGISTRY env var pointing to custom registry fires."""
+        server = make_server(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem"],
+            env={"NPM_CONFIG_REGISTRY": "https://private.registry.example.com"},
+        )
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-007" for f in findings)
+
+    def test_sc007_pypi_index_url_override(self):
+        """SC-007 (PyPI): --index-url pointing to custom index fires."""
+        server = make_server(
+            command="uv",
+            args=["run", "--index-url", "https://private.nexus.corp/pypi/simple", "--with", "mcp-server", "server.py"],
+        )
+        findings = check_supply_chain(server)
+        sc7 = [f for f in findings if f.check_id == "SC-007"]
+        assert len(sc7) == 1
+        assert "PyPI" in sc7[0].title
+
     def test_uv_run_with_pinned_python_pkg_no_sec006(self):
         """Python packages pinned with == should not trigger SEC-006 via AT-001."""
         import json
