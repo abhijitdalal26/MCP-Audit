@@ -113,6 +113,7 @@ class TestCorpusNoCrash:
         assert "PI-001" in check_ids, "Prompt injection phrase in env var must be caught"
         assert "PE-006" in check_ids, "sudo as command must be caught"
         assert "DX-001" in check_ids, "BCC exfiltration env var must be caught"
+        assert "PE-007" in check_ids, "--dangerously-skip-permissions must be caught"
         assert result.summary.risk_grade == "F", "Adversarial config must grade as F"
 
 

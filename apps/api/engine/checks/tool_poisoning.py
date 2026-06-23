@@ -11,7 +11,11 @@ _INJECTION_PATTERNS: list[tuple[re.Pattern, str]] = [
      "role manipulation directive"),
     (re.compile(r'(hidden|secret|confidential)\s+instructions?', re.I), "hidden instruction reference"),
     (re.compile(r'<\|.+?\|>', re.I), "control token injection"),
+    # LLM control tokens: Llama [INST], Claude <<SYS>>, GPT-4 ###
     (re.compile(r'\[INST\]|\[/INST\]|<<SYS>>|<</SYS>>', re.I), "LLM control token"),
+    (re.compile(r'###\s*SYSTEM\s*###|###\s*USER\s*###|###\s*ASSISTANT\s*###', re.I), "LLM section delimiter"),
+    # XML-style system prompt tags used in Claude 3.5+ multi-turn injection
+    (re.compile(r'<system>|</system>|<user>|</user>|<assistant>|</assistant>', re.I), "XML role delimiter injection"),
     (re.compile(r'AUTOEXECUTE|AUTO_EXECUTE|SYSTEM_OVERRIDE', re.I), "automation override keyword"),
     (re.compile(r'disregard\s+(all|any|previous)', re.I), "instruction disregard phrase"),
     (re.compile(r'(your|the)\s+(real|true|actual)\s+(purpose|goal|mission|task)\s+is', re.I), "purpose redefinition"),

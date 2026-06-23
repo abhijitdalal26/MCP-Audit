@@ -2,11 +2,11 @@
   "source_file": "synthetic_adversarial.json",
   "risk_score": 100,
   "risk_grade": "F",
-  "total_findings": 23,
+  "total_findings": 27,
   "by_severity": {
-    "critical": 6,
-    "high": 9,
-    "medium": 8,
+    "critical": 7,
+    "high": 10,
+    "medium": 10,
     "low": 0,
     "info": 0
   },
@@ -58,6 +58,14 @@
       "server": "elevated-runner",
       "owasp": "MCP02",
       "attack_tactic": "privilege-escalation"
+    },
+    {
+      "check_id": "PE-007",
+      "title": "Permission bypass flag in server args: `--dangerously-skip-permissions`",
+      "severity": "critical",
+      "server": "permission-bypass",
+      "owasp": "MCP02",
+      "attack_tactic": "defense-evasion"
     },
     {
       "check_id": "PE-001",
@@ -113,6 +121,14 @@
       "severity": "high",
       "server": "injection-test",
       "owasp": "MCP03",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "PE-001",
+      "title": "Over-broad filesystem path: `/Users`",
+      "severity": "high",
+      "server": "permission-bypass",
+      "owasp": "MCP02",
       "attack_tactic": null
     },
     {
@@ -184,6 +200,22 @@
       "title": "npm lifecycle scripts will run on install: `some-mcp-server@1.0.0`",
       "severity": "medium",
       "server": "injection-test",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-filesystem`",
+      "severity": "medium",
+      "server": "permission-bypass",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-filesystem`",
+      "severity": "medium",
+      "server": "permission-bypass",
       "owasp": "MCP04",
       "attack_tactic": "execution"
     },

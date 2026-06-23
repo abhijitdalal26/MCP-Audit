@@ -56,6 +56,20 @@ _ELEVATED_CMD_BASENAMES = {"sudo", "su", "doas", "pkexec", "runas"}
 # Sudo/runas in args is also dangerous: e.g. bash args ["-c", "sudo rm -rf /"]
 _SUDO_IN_ARGS_RE = re.compile(r'(?:^|[\s;|&])(sudo|doas|pkexec)\s', re.I)
 
+# PE-007: Permission bypass flags — auto-approve all tool calls without user consent
+# These flags cause the MCP client to skip ALL user confirmation prompts, meaning
+# any tool poisoning or prompt injection attack executes immediately without approval.
+# Source: Claude Desktop documentation ("--dangerously-skip-permissions" is explicitly
+# warned against for production use); Adversa AI Top 25 #4 (automatic tool execution).
+_PERMISSION_BYPASS_FLAGS: set[str] = {
+    "--dangerously-skip-permissions",
+    "--dangerously-allow-all-permissions",
+    "--skip-permissions",
+    "--allow-all-permissions",
+    "--bypass-permissions",
+    "--no-permissions",
+}
+
 _ADMIN_ENV_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("PE-003", re.compile(r'(?i)(sudo_password|root_token|root_password|admin_key|admin_password|admin_token)')),
     ("PE-003", re.compile(r'(?i)(master_key|super_admin|superuser_password|master_password)')),
@@ -333,5 +347,39 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                 attack_tactic="privilege-escalation",
                 cwe_id="CWE-250",
             ))
+
+    # PE-007: Permission bypass flag in server args
+    # These flags cause the MCP client to auto-approve every tool call without user consent.
+    # Combining PE-007 with any prompt injection or supply chain attack = immediate exploit.
+    for arg in server.args:
+        if arg.lower() in _PERMISSION_BYPASS_FLAGS:
+            findings.append(Finding(
+                check_id="PE-007",
+                title=f"Permission bypass flag in server args: `{arg}`",
+                detail=(
+                    f"Server `{server.name}` passes `{arg}` in its arguments. "
+                    "This flag instructs the MCP client to automatically approve ALL tool calls "
+                    "from this server without showing the user a confirmation prompt. "
+                    "The MCP permission model exists specifically to prevent unauthorized tool calls — "
+                    "bypassing it means any prompt injection, tool poisoning, or supply chain attack "
+                    "against this server executes silently with zero user interaction. "
+                    "This flag is intended for trusted local development only; it must never appear "
+                    "in shared, team, or production configurations."
+                ),
+                severity=Severity.CRITICAL,
+                owasp=OWASPCategory.MCP02,
+                server_name=server.name,
+                remediation=(
+                    f"Remove `{arg}` from the server args immediately. "
+                    "The user permission prompt is a primary defense layer for MCP security — "
+                    "it gives users the opportunity to review and block unexpected tool calls. "
+                    "If you need to reduce approval friction for trusted servers, use "
+                    "per-tool approval policies rather than blanket bypass flags."
+                ),
+                engine="custom",
+                attack_tactic="defense-evasion",
+                cwe_id="CWE-284",
+            ))
+            break  # One PE-007 per server
 
     return findings
