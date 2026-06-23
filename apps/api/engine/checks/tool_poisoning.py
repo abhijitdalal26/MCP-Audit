@@ -18,13 +18,16 @@ _INJECTION_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'developer\s+mode|jailbreak\s+mode|DAN\s+mode', re.I), "jailbreak mode reference"),
 ]
 
-# Data exfiltration indicators in args/descriptions (AS-017 equivalent)
+# Data exfiltration indicators in args/env vars (AS-017 equivalent)
 _EXFILTRATION_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'(?i)(send|upload|transmit|exfiltrat|forward|relay)\s+(data|files?|credentials?|tokens?)\s+(to|from)'), "data transfer directive"),
     (re.compile(r'(?i)POST\s+to\s+https?://'), "HTTP POST to external URL"),
     (re.compile(r'https?://(?!localhost|127\.0\.0\.1|0\.0\.0\.0)[^\s]{15,}'), "external URL embedded in argument"),
     (re.compile(r'(?i)(webhook|callback)\s+url'), "webhook/callback URL reference"),
     (re.compile(r'(?i)(steal|harvest|collect|scrape)\s+(data|credentials?|tokens?|passwords?)'), "data harvesting language"),
+    # Postmark Sep 2025: DEFAULT_BCC env var silently exfiltrated all emails to attacker for 2 weeks
+    (re.compile(r'(?i)(bcc|blind.?carbon.?copy)'), "BCC/blind copy email exfiltration"),
+    (re.compile(r'(?i)(forward.?to|cc.?to|reply.?to)\s*[=:]\s*[^\s@]+@[^\s]{3,}'), "email forwarding rule"),
 ]
 
 _MAX_ARGS_LENGTH = 2000
@@ -40,30 +43,37 @@ _HEX_ESC_RE = re.compile(r'(?:\\x[0-9a-fA-F]{2}){4,}')
 def check_tool_poisoning(server: MCPServer) -> list[Finding]:
     findings: list[Finding] = []
     full_args = " ".join(server.args)
+    # Also build a searchable string from env var VALUES for injection/exfiltration patterns
+    full_env_vals = " ".join(f"{k}={v}" for k, v in server.env.items())
 
-    # PI-001: Prompt injection keywords in server args
-    for pattern, description in _INJECTION_PATTERNS:
-        match = pattern.search(full_args)
-        if match:
-            findings.append(Finding(
-                check_id="PI-001",
-                title=f"Potential prompt injection in server args ({description})",
-                detail=(
-                    f"Server `{server.name}` contains argument text matching a known prompt injection pattern "
-                    f"({description}): `{match.group(0)!r}`. "
-                    "This phrasing is used in tool poisoning attacks to silently hijack AI assistant behavior."
-                ),
-                severity=Severity.HIGH,
-                owasp=OWASPCategory.MCP03,
-                server_name=server.name,
-                remediation=(
-                    "Review this server's arguments and source code carefully. "
-                    "If it was installed from an untrusted source, remove it. "
-                    "Legitimate MCP servers do not embed instruction-override language in their configuration."
-                ),
-                engine="custom",
-            ))
-            break  # One PI-001 per server
+    # PI-001: Prompt injection keywords in server args OR env var values
+    # Env values: real-world attack — malicious env var instructs server to override system behavior
+    for target_text, source_label in [(full_args, "args"), (full_env_vals, "env vars")]:
+        for pattern, description in _INJECTION_PATTERNS:
+            match = pattern.search(target_text)
+            if match:
+                findings.append(Finding(
+                    check_id="PI-001",
+                    title=f"Potential prompt injection in server {source_label} ({description})",
+                    detail=(
+                        f"Server `{server.name}` contains {source_label} text matching a known prompt injection pattern "
+                        f"({description}): `{match.group(0)!r}`. "
+                        "This phrasing is used in tool poisoning attacks to silently hijack AI assistant behavior."
+                    ),
+                    severity=Severity.HIGH,
+                    owasp=OWASPCategory.MCP03,
+                    server_name=server.name,
+                    remediation=(
+                        f"Review this server's {source_label} and source code carefully. "
+                        "If it was installed from an untrusted source, remove it. "
+                        "Legitimate MCP servers do not embed instruction-override language in their configuration."
+                    ),
+                    engine="custom",
+                ))
+                break  # One PI-001 per source (args or env)
+        else:
+            continue
+        break  # Found one PI-001 total — don't double-fire
 
     # PI-002: Excessively long combined args
     if len(full_args) > _MAX_ARGS_LENGTH:
@@ -147,29 +157,35 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
             ))
             break  # One PI-004 per server
 
-    # DX-001: Data exfiltration patterns (AS-017 equivalent)
-    for pattern, description in _EXFILTRATION_PATTERNS:
-        match = pattern.search(full_args)
-        if match:
-            findings.append(Finding(
-                check_id="DX-001",
-                title=f"Potential data exfiltration pattern in server args: {description}",
-                detail=(
-                    f"Server `{server.name}` arguments contain language suggesting data exfiltration: "
-                    f"`{match.group(0)!r}` ({description}). "
-                    "Legitimate MCP servers do not need to instruct users to transmit data to external endpoints "
-                    "via their configuration arguments."
-                ),
-                severity=Severity.HIGH,
-                owasp=OWASPCategory.MCP03,
-                server_name=server.name,
-                remediation=(
-                    "Review this server's source code and documentation carefully. "
-                    "If the server makes undisclosed outbound connections, remove it. "
-                    "Legitimate MCP servers document all network calls explicitly."
-                ),
-                engine="custom",
-            ))
-            break  # One DX-001 per server
+    # DX-001: Data exfiltration patterns in args OR env var values
+    # Real-world incident (Postmark, Sep 2025): DEFAULT_BCC env var silently exfiltrated all emails
+    for target_text, source_label in [(full_args, "args"), (full_env_vals, "env vars")]:
+        for pattern, description in _EXFILTRATION_PATTERNS:
+            match = pattern.search(target_text)
+            if match:
+                findings.append(Finding(
+                    check_id="DX-001",
+                    title=f"Potential data exfiltration pattern in server {source_label}: {description}",
+                    detail=(
+                        f"Server `{server.name}` {source_label} contain language suggesting data exfiltration: "
+                        f"`{match.group(0)!r}` ({description}). "
+                        "In the Postmark MCP incident (Sep 2025), a malicious env var (DEFAULT_BCC) silently "
+                        "BCC'd all emails to an attacker for 2 weeks. "
+                        "Legitimate MCP servers do not need data-transfer directives in configuration."
+                    ),
+                    severity=Severity.HIGH,
+                    owasp=OWASPCategory.MCP03,
+                    server_name=server.name,
+                    remediation=(
+                        f"Review this server's {source_label} and source code carefully. "
+                        "If the server makes undisclosed outbound connections or email forwarding, remove it. "
+                        "Legitimate MCP servers document all network calls and data flows explicitly."
+                    ),
+                    engine="custom",
+                ))
+                break
+        else:
+            continue
+        break  # One DX-001 total — don't double-fire
 
     return findings

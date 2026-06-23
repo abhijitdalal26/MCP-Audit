@@ -121,6 +121,37 @@ class TestUnpinnedVersions:
         assert not any(f.check_id == "SEC-006" for f in findings)
 
 
+class TestCloudMetadataEndpoint:
+    """SEC-007: Cloud instance metadata endpoints in env vars (SSRF credential theft vector)."""
+
+    def test_aws_imds_endpoint_flagged(self):
+        server = make_server(env={"BACKEND_URL": "http://169.254.169.254/latest/meta-data/iam/security-credentials/"})
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-007" for f in findings)
+
+    def test_ecs_imds_endpoint_flagged(self):
+        server = make_server(env={"METADATA_URL": "http://169.254.170.2/v2/credentials/abc123"})
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-007" for f in findings)
+
+    def test_gcp_metadata_flagged(self):
+        server = make_server(env={"AUTH_URL": "http://metadata.google.internal/computeMetadata/v1/"})
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-007" for f in findings)
+
+    def test_severity_is_critical(self):
+        server = make_server(env={"URL": "http://169.254.169.254/latest/"})
+        findings = check_secrets(server)
+        sec7 = [f for f in findings if f.check_id == "SEC-007"]
+        assert len(sec7) >= 1
+        assert sec7[0].severity == Severity.CRITICAL
+
+    def test_normal_url_not_flagged(self):
+        server = make_server(env={"API_URL": "https://api.example.com/v1/data"})
+        findings = check_secrets(server)
+        assert not any(f.check_id == "SEC-007" for f in findings)
+
+
 class TestSecretsInArgs:
     """Secrets passed as CLI arg values (not env vars) are also detected."""
 

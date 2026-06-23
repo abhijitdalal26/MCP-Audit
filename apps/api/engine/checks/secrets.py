@@ -29,6 +29,11 @@ _VALUE_PATTERNS: list[tuple[str, str, re.Pattern, Severity]] = [
      re.compile(r'redis://:[^@\s]+@'), Severity.HIGH),
     ("SEC-003", "HTTP Basic Auth credentials embedded in URL",
      re.compile(r'https?://[^:@\s]{1,64}:[^@\s]{3,}@[a-zA-Z0-9]'), Severity.HIGH),
+    # SEC-007: Cloud instance metadata service endpoint
+    # If an MCP server fetches this URL, it gets cloud IAM credentials (AWS/GCP/Azure).
+    # Presence in env vars suggests either a misconfigured server or intentional credential theft.
+    ("SEC-007", "Cloud instance metadata endpoint (IMDS) URL",
+     re.compile(r'169\.254\.169\.254|169\.254\.170\.2|metadata\.google\.internal', re.I), Severity.CRITICAL),
     # SEC-004: API keys
     ("SEC-004", "OpenAI API key",
      re.compile(r'sk-(?:proj-)?[A-Za-z0-9_-]{40,}'), Severity.HIGH),
