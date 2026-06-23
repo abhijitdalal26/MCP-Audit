@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-175%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-180%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,7 +13,7 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**38 checks across 10 modules:**
+**39 checks across 10 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
@@ -23,7 +23,7 @@ Every MCP server you add to Claude Desktop or Cursor gets access to your filesys
 | `tool_poisoning.py` | PI-001–004, DX-001 | Prompt injection, obfuscation, data exfiltration |
 | `privilege.py` | PE-001–005 | Overbroad filesystem, shell access, Docker privilege escalation |
 | `shadow.py` | SH-001–005 | Unregistered servers, HTTP, homoglyphs, auto-discovery |
-| `code_execution.py` | EX-001–002 | Inline code execution, command substitution |
+| `code_execution.py` | EX-001–003 | Inline code execution, command substitution, PowerShell encoded cmds, curl-pipe-bash |
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
 | `lifecycle.py` | LF-001 | Postinstall script abuse |
 | `config_level.py` | CL-001–002, EC-001 | Confused deputy, duplicate servers, debug log exposure |
@@ -96,8 +96,8 @@ apps/api/           FastAPI backend
     models.py       Pydantic models (Finding, ScanResult, ScanSummary)
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
-    checks/         38 check implementations
-  tests/            175 tests (unit + property-based + real-world corpus)
+    checks/         39 check implementations
+  tests/            180 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -125,7 +125,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 175 tests
+.venv/Scripts/pytest tests/ -v    # 180 tests
 
 # Frontend
 cd apps/web
