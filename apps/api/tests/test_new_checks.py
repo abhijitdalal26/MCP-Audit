@@ -1,10 +1,12 @@
-"""Tests for new checks: SH-004, SH-005, SC-005, AT-004, and cwe_id on Finding model."""
+"""Tests for new checks: SH-004, SH-005, SC-005, AT-004, PE-005, PI-004, and cwe_id on Finding model."""
 import json
 import pytest
 from tests.conftest import make_server, make_config
 from engine.checks.shadow import check_shadow
 from engine.checks.supply_chain import check_supply_chain
 from engine.checks.audit import check_audit
+from engine.checks.tool_poisoning import check_tool_poisoning
+from engine.checks.secrets import check_secrets
 from engine.parser import parse_config, MCPServer
 from engine.scanner import scan
 from engine.models import Severity, Finding
@@ -451,3 +453,97 @@ class TestCweIdOnFindingModel:
         sh5_findings = [f for f in result.findings if f.check_id == "SH-005"]
         assert len(sh5_findings) == 1
         assert sh5_findings[0].cwe_id == "CWE-284"
+
+
+class TestPI004Obfuscation:
+    """PI-004: Escape-sequence obfuscation in server args (defense-evasion technique).
+
+    Attack vector: JSON config uses double-backslash (\\\\uXXXX) so that after JSON parsing
+    the string contains literal \\uXXXX sequences — invisible in UI but interpreted by LLMs.
+    """
+
+    def test_unicode_escapes_flagged(self):
+        # After JSON parse: arg contains literal Igno = "Ign" hidden in escapes
+        # In Python string: "\\u0049\\u0067\\u006e\\u006f" = backslash-u-0049-backslash-u-0067...
+        esc_arg = "\\u0049\\u0067\\u006e\\u006f\\u0072\\u0065\\u0020\\u0061\\u006c\\u006c"
+        server = MCPServer(name="evil-server", command="npx", args=["-y", "some-pkg", esc_arg])
+        findings = check_tool_poisoning(server)
+        pi4 = [f for f in findings if f.check_id == "PI-004"]
+        assert len(pi4) == 1
+        assert pi4[0].severity == Severity.HIGH
+
+    def test_hex_escapes_flagged(self):
+        # \x69\x67\x6e\x6f\x72\x65 = "ignore" in hex — 6 consecutive hex escapes
+        esc_arg = "\\x69\\x67\\x6e\\x6f\\x72\\x65\\x20\\x61\\x6c\\x6c"
+        server = MCPServer(name="evil-server", command="npx", args=["-y", "pkg", esc_arg])
+        findings = check_tool_poisoning(server)
+        pi4 = [f for f in findings if f.check_id == "PI-004"]
+        assert len(pi4) == 1
+
+    def test_cwe_116_and_mcp03(self):
+        esc_arg = "\\u0049\\u0067\\u006e\\u006f\\u0072\\u0065\\u0020\\u0070\\u0072"
+        server = MCPServer(name="evil-server", command="npx", args=[esc_arg])
+        findings = check_tool_poisoning(server)
+        pi4 = [f for f in findings if f.check_id == "PI-004"]
+        assert len(pi4) == 1
+        assert pi4[0].cwe_id == "CWE-116"
+        assert pi4[0].owasp.value == "MCP03"
+
+    def test_attack_tactic_defense_evasion(self):
+        esc_arg = "\\u0049\\u0067\\u006e\\u006f\\u0072\\u0065\\u0020\\u0070\\u0072"
+        server = MCPServer(name="evil-server", command="npx", args=[esc_arg])
+        findings = check_tool_poisoning(server)
+        pi4 = [f for f in findings if f.check_id == "PI-004"]
+        assert pi4[0].attack_tactic == "defense-evasion"
+
+    def test_only_3_unicode_escapes_not_flagged(self):
+        """3 consecutive unicode escapes (below threshold of 4) should not be flagged."""
+        esc_arg = "\\u0049\\u0067\\u006e"  # only 3 — below threshold
+        server = MCPServer(name="server", command="npx", args=["-y", esc_arg])
+        findings = check_tool_poisoning(server)
+        assert not any(f.check_id == "PI-004" for f in findings)
+
+    def test_normal_args_not_flagged(self):
+        server = MCPServer(
+            name="filesystem",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem@1.0.0", "/Users/me/projects"],
+        )
+        findings = check_tool_poisoning(server)
+        assert not any(f.check_id == "PI-004" for f in findings)
+
+    def test_at_most_one_pi004_per_server(self):
+        """Even if multiple args contain obfuscation, only one PI-004 fires per server."""
+        esc1 = "\\u0049\\u0067\\u006e\\u006f\\u0072\\u0065"
+        esc2 = "\\u0049\\u0067\\u006e\\u006f\\u0072\\u0065\\u0073"
+        server = MCPServer(name="evil-server", command="npx", args=[esc1, esc2])
+        findings = check_tool_poisoning(server)
+        pi4 = [f for f in findings if f.check_id == "PI-004"]
+        assert len(pi4) == 1
+
+
+class TestSEC003HttpBasicAuth:
+    """SEC-003 extended: HTTP Basic Auth credentials embedded in URL."""
+
+    def test_http_basic_auth_url_detected(self):
+        server = make_server(env={"API_URL": "http://admin:mysecretpassword@internal.server.com/api"})
+        findings = check_secrets(server)
+        sec3 = [f for f in findings if f.check_id == "SEC-003"]
+        assert len(sec3) >= 1
+
+    def test_https_basic_auth_url_detected(self):
+        server = make_server(env={"ENDPOINT": "https://user:supersecret@example.internal/v1"})
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-003" for f in findings)
+
+    def test_url_without_password_not_flagged(self):
+        """http://example.com without credentials is not an auth URL."""
+        server = make_server(env={"URL": "https://api.example.com/endpoint"})
+        findings = check_secrets(server)
+        sec3 = [f for f in findings if f.check_id == "SEC-003"]
+        assert len(sec3) == 0
+
+    def test_placeholder_http_auth_not_flagged(self):
+        server = make_server(env={"URL": "${BASE_URL}"})
+        findings = check_secrets(server)
+        assert not any(f.check_id == "SEC-003" for f in findings)

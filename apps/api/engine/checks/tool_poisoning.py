@@ -30,6 +30,12 @@ _EXFILTRATION_PATTERNS: list[tuple[re.Pattern, str]] = [
 _MAX_ARGS_LENGTH = 2000
 _HORIZONTAL_SCROLL_THRESHOLD = 300  # chars on a single line before flagging PI-003
 
+# PI-004: Obfuscation via escape sequences
+# 4+ consecutive unicode escapes = "bash" or "ignore" hiding in plain sight
+_UNICODE_ESC_RE = re.compile(r'(?:\\u[0-9a-fA-F]{4}){4,}')
+# 4+ consecutive hex escapes = same technique in hex form
+_HEX_ESC_RE = re.compile(r'(?:\\x[0-9a-fA-F]{2}){4,}')
+
 
 def check_tool_poisoning(server: MCPServer) -> list[Finding]:
     findings: list[Finding] = []
@@ -107,6 +113,39 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
                 engine="custom",
             ))
             break  # One PI-003 per server
+
+    # PI-004: Obfuscation via escape sequences in args
+    # Detects unicode/hex escape sequences used to hide injection payloads beyond what tools display.
+    # Real-world attack: "\\u0049\\u0067\\u006e\\u006f\\u0072\\u0065" decodes to "Ignore"
+    for i, arg in enumerate(server.args):
+        uni_match = _UNICODE_ESC_RE.search(arg)
+        hex_match = _HEX_ESC_RE.search(arg)
+        obf_match = uni_match or hex_match
+        if obf_match:
+            enc_type = "unicode escape sequences (\\uXXXX)" if uni_match else "hex escape sequences (\\xXX)"
+            findings.append(Finding(
+                check_id="PI-004",
+                title=f"Obfuscated payload in server args via {enc_type.split('(')[0].strip()}",
+                detail=(
+                    f"Server `{server.name}` has argument #{i+1} containing {enc_type}: "
+                    f"`{obf_match.group(0)!r}`. "
+                    "Escape sequences are used in tool poisoning attacks to embed injection payloads "
+                    "that look like gibberish in UI displays but decode to instruction-override text "
+                    "when interpreted by the language model. This is a strong indicator of adversarial content."
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP03,
+                server_name=server.name,
+                remediation=(
+                    f"Remove argument #{i+1} from server `{server.name}` and investigate its source. "
+                    "Legitimate MCP server arguments never require escape-sequence-encoded payloads. "
+                    "If the server was installed from a third-party source, remove it immediately."
+                ),
+                engine="custom",
+                attack_tactic="defense-evasion",
+                cwe_id="CWE-116",
+            ))
+            break  # One PI-004 per server
 
     # DX-001: Data exfiltration patterns (AS-017 equivalent)
     for pattern, description in _EXFILTRATION_PATTERNS:
