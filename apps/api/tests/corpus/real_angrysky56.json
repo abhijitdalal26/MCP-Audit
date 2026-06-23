@@ -1,0 +1,113 @@
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "F:/ai_workspace/servers/mcp-prototypes/servers/src/sqlite",
+        "run",
+        "mcp-server-sqlite",
+        "--db-path",
+        "F:/ai_workspace/Nexus-Prime/NEXUS_PRIME.db"
+      ]
+    },
+    "filesystem": {
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": [
+        "C:/Program Files/nodejs/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+        "F:/ai_workspace",
+        "F:/",
+        "D:/"
+      ]
+    },
+    "github": {
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": [
+        "C:/Program Files/nodejs/node_modules/@modelcontextprotocol/server-github/dist/index.js"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your token"
+      }
+    },
+    "postgres": {
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": [
+        "C:/Program Files/nodejs/node_modules/@modelcontextprotocol/server-postgres/dist/index.js",
+        "F:/PostgreSQL"
+      ]
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    },
+    "brave-search": {
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": [
+        "C:/Program Files/nodejs/node_modules/@modelcontextprotocol/server-brave-search/dist/index.js"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "your key"
+      }
+    },
+    "server-win-cli": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@simonb97/server-win-cli",
+        "--config",
+        "F:/ai_workspace/servers/servers_forked_for_dev/win-cli-mcp-server/config.json"
+      ]
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "xoxb-etc...",
+        "SLACK_TEAM_ID": "T-etc..."
+      }
+    },
+    "discord-raw": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "F:/ai_workspace/servers/mcp-prototypes/mcp-discord-raw",
+        "run",
+        "discord-raw-mcp"
+      ],
+      "env": {
+        "DISCORD_TOKEN": "your token"
+      }
+    },
+    "chat-anthropic": {
+      "command": "node",
+      "args": [
+        "F:/ai_workspace/servers/servers_forked_for_dev/any-chat-completions-mcp/build/index.js"
+      ],
+      "env": {
+        "AI_CHAT_KEY": "ANTHROPIC_API_KEY",
+        "AI_CHAT_NAME": "Claude2Claude",
+        "AI_CHAT_MODEL": "claude-3-5-sonnet-20241022",
+        "AI_CHAT_BASE_URL": "https://api.anthropic.com/v1"
+      }
+    },
+    "neo4j": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "F:/GithubRepos/mcp-neo4j/servers/mcp-neo4j-cypher/src/mcp_neo4j_cypher",
+        "run",
+        "mcp-neo4j-cypher",
+        "--db-url",
+        "bolt://localhost:7687",
+        "--username",
+        "neo4j",
+        "--password",
+        "put your pw here"
+      ]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"]
+    }
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "source_file": "real_angrysky56.json",
+  "risk_score": 94,
+  "risk_grade": "F",
+  "total_findings": 19,
+  "by_severity": {
+    "critical": 0,
+    "high": 3,
+    "medium": 16,
+    "low": 0,
+    "info": 0
+  },
+  "findings": [
+    {
+      "check_id": "PE-001",
+      "title": "Over-broad filesystem path: `F:/`",
+      "severity": "high",
+      "server": "filesystem",
+      "owasp": "MCP02",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "PE-001",
+      "title": "Over-broad filesystem path: `D:/`",
+      "severity": "high",
+      "server": "filesystem",
+      "owasp": "MCP02",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-004",
+      "title": "Sensitive env var `SLACK_BOT_TOKEN` with hardcoded value",
+      "severity": "high",
+      "server": "slack",
+      "owasp": "MCP01",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `run`",
+      "severity": "medium",
+      "server": "sqlite",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `mcp-server-sqlite`",
+      "severity": "medium",
+      "server": "sqlite",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-puppeteer`",
+      "severity": "medium",
+      "server": "puppeteer",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-puppeteer`",
+      "severity": "medium",
+      "server": "puppeteer",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@simonb97/server-win-cli`",
+      "severity": "medium",
+      "server": "server-win-cli",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SC-003",
+      "title": "Package from unverified scope: `@simonb97`",
+      "severity": "medium",
+      "server": "server-win-cli",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unregistered MCP server package: `@simonb97/server-win-cli`",
+      "severity": "medium",
+      "server": "server-win-cli",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@simonb97/server-win-cli`",
+      "severity": "medium",
+      "server": "server-win-cli",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-slack`",
+      "severity": "medium",
+      "server": "slack",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `run`",
+      "severity": "medium",
+      "server": "discord-raw",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `discord-raw-mcp`",
+      "severity": "medium",
+      "server": "discord-raw",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `run`",
+      "severity": "medium",
+      "server": "neo4j",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `mcp-neo4j-cypher`",
+      "severity": "medium",
+      "server": "neo4j",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `neo4j`",
+      "severity": "medium",
+      "server": "neo4j",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `put your pw here`",
+      "severity": "medium",
+      "server": "neo4j",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-memory`",
+      "severity": "medium",
+      "server": "memory",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    }
+  ]
+}

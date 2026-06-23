@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "confluent": {
+      "command": "node",
+      "args": [
+        "/path/to/confluent-mcp-server/dist/index.js",
+        "--config",
+        "/path/to/confluent-mcp-server/config.yaml"
+      ]
+    }
+  }
+}

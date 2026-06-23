@@ -1,0 +1,231 @@
+{
+  "source_file": "real_canfieldjuan.json",
+  "risk_score": 100,
+  "risk_grade": "F",
+  "total_findings": 27,
+  "by_severity": {
+    "critical": 0,
+    "high": 2,
+    "medium": 25,
+    "low": 0,
+    "info": 0
+  },
+  "findings": [
+    {
+      "check_id": "SC-002",
+      "title": "Possible typosquatted package: `mcp-server-sqlite-npx`",
+      "severity": "high",
+      "server": "sqlite",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SC-002",
+      "title": "Possible typosquatted package: `@benborla29/mcp-server-mysql`",
+      "severity": "high",
+      "server": "mysql",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-memory`",
+      "severity": "medium",
+      "server": "memory",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-memory`",
+      "severity": "medium",
+      "server": "memory",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-github`",
+      "severity": "medium",
+      "server": "github",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-github`",
+      "severity": "medium",
+      "server": "github",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-sequential-thinking`",
+      "severity": "medium",
+      "server": "sequential-thinking",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-sequential-thinking`",
+      "severity": "medium",
+      "server": "sequential-thinking",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-puppeteer`",
+      "severity": "medium",
+      "server": "puppeteer",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-puppeteer`",
+      "severity": "medium",
+      "server": "puppeteer",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `mcp-server-sqlite-npx`",
+      "severity": "medium",
+      "server": "sqlite",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `${env:SQLITE_DB_PATH}`",
+      "severity": "medium",
+      "server": "sqlite",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `mcp-server-sqlite-npx`",
+      "severity": "medium",
+      "server": "sqlite",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SC-003",
+      "title": "Package from unverified scope: `@browsermcp`",
+      "severity": "medium",
+      "server": "browsermcp",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unregistered MCP server package: `@browsermcp/mcp/latest`",
+      "severity": "medium",
+      "server": "browsermcp",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unregistered MCP server package: `github:FabianGenell/pdf-mcp-server`",
+      "severity": "medium",
+      "server": "pdf-generator",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `npx`",
+      "severity": "medium",
+      "server": "excel",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@negokaz/excel-mcp-server`",
+      "severity": "medium",
+      "server": "excel",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SC-003",
+      "title": "Package from unverified scope: `@playwright`",
+      "severity": "medium",
+      "server": "playwright",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unregistered MCP server package: `@playwright/mcp/latest`",
+      "severity": "medium",
+      "server": "playwright",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@modelcontextprotocol/server-puppeteer`",
+      "severity": "medium",
+      "server": "file-converter",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@modelcontextprotocol/server-puppeteer`",
+      "severity": "medium",
+      "server": "file-converter",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "SEC-006",
+      "title": "Unpinned package version: `@benborla29/mcp-server-mysql`",
+      "severity": "medium",
+      "server": "mysql",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SC-003",
+      "title": "Package from unverified scope: `@benborla29`",
+      "severity": "medium",
+      "server": "mysql",
+      "owasp": "MCP04",
+      "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unregistered MCP server package: `@benborla29/mcp-server-mysql`",
+      "severity": "medium",
+      "server": "mysql",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "LF-001",
+      "title": "npm lifecycle scripts will run on install: `@benborla29/mcp-server-mysql`",
+      "severity": "medium",
+      "server": "mysql",
+      "owasp": "MCP04",
+      "attack_tactic": "execution"
+    },
+    {
+      "check_id": "CL-002",
+      "title": "Duplicate server package: `file-converter` duplicates `puppeteer`",
+      "severity": "medium",
+      "server": "file-converter",
+      "owasp": "MCP03",
+      "attack_tactic": null
+    }
+  ]
+}

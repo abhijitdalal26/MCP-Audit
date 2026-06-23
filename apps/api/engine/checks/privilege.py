@@ -1,3 +1,4 @@
+import os
 import re
 from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
@@ -6,6 +7,23 @@ _BROAD_PATHS: list[str] = [
     "/", "/Users", "/home", "/root", "/etc", "/var",
     "C:\\", "C:\\Users", "C:\\Windows", "/usr", "/opt",
 ]
+
+# Any single Windows drive letter root: F:/, F:\, F:
+_WIN_DRIVE_ROOT_RE = re.compile(r'^[A-Za-z]:[/\\]?$')
+
+# Commands that can invoke filesystem/JS/Python servers (by basename without extension)
+_EXEC_BASENAMES = {"npx", "node", "uvx", "uv", "python", "python3", "deno", "bun"}
+
+
+def _is_node_like_command(cmd: str | None) -> bool:
+    """True if command is a known script-runner, accepting full paths like /usr/bin/node."""
+    if cmd is None:
+        return False
+    base = os.path.basename(cmd).lower()
+    # Strip extensions (.exe, .cmd) for Windows paths
+    if "." in base:
+        base = base.rsplit(".", 1)[0]
+    return base in _EXEC_BASENAMES
 
 _SHELL_KEYWORDS: list[str] = [
     "--exec", "--shell", "--cmd", "--command",
@@ -42,29 +60,40 @@ def check_privilege(server: MCPServer) -> list[Finding]:
     findings: list[Finding] = []
 
     # PE-001: Filesystem server with overly broad paths
-    if server.command in ("npx", "node", "uvx", "python", "python3"):
+    if _is_node_like_command(server.command):
+        seen_pe1: set[str] = set()
         for arg in server.args:
+            if arg in seen_pe1:
+                continue
+            flagged = False
+            # Check static broad path list
             for broad in _BROAD_PATHS:
                 if _is_broad_path(arg, broad):
-                    findings.append(Finding(
-                        check_id="PE-001",
-                        title=f"Over-broad filesystem path: `{arg}`",
-                        detail=(
-                            f"Server `{server.name}` has access to `{arg}`, an overly broad filesystem path. "
-                            "This grants the MCP server read/write access to far more files than it needs, "
-                            "including potentially sensitive system files, SSH keys, and credentials."
-                        ),
-                        severity=Severity.HIGH,
-                        owasp=OWASPCategory.MCP02,
-                        server_name=server.name,
-                        remediation=(
-                            f"Restrict the path to the minimum required directory. "
-                            f"Replace `{arg}` with only the specific project folder this server needs "
-                            "(e.g., `/Users/you/projects/myapp` instead of `/Users`)."
-                        ),
-                        engine="custom",
-                    ))
+                    flagged = True
                     break
+            # Dynamic check: Windows drive roots (F:/, D:\, etc.)
+            if not flagged and _WIN_DRIVE_ROOT_RE.match(arg):
+                flagged = True
+            if flagged:
+                seen_pe1.add(arg)
+                findings.append(Finding(
+                    check_id="PE-001",
+                    title=f"Over-broad filesystem path: `{arg}`",
+                    detail=(
+                        f"Server `{server.name}` has access to `{arg}`, an overly broad filesystem path. "
+                        "This grants the MCP server read/write access to far more files than it needs, "
+                        "including potentially sensitive system files, SSH keys, and credentials."
+                    ),
+                    severity=Severity.HIGH,
+                    owasp=OWASPCategory.MCP02,
+                    server_name=server.name,
+                    remediation=(
+                        f"Restrict the path to the minimum required directory. "
+                        f"Replace `{arg}` with only the specific project folder this server needs "
+                        "(e.g., `/Users/you/projects/myapp` instead of `/Users`)."
+                    ),
+                    engine="custom",
+                ))
 
     # PE-002: Shell execution capabilities in args
     for arg in server.args:
