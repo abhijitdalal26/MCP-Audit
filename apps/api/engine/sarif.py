@@ -35,7 +35,8 @@ def to_sarif(result: ScanResult, config_path: str = "mcp.json") -> dict:
                 "fullDescription": {"text": finding.detail},
                 "helpUri": f"https://mcpaudit.app/checks/{finding.check_id}",
                 "properties": {
-                    "tags": [finding.owasp.value, "security", "mcp"],
+                    "tags": [finding.owasp.value, "security", "mcp"]
+                        + ([finding.cwe_id] if finding.cwe_id else []),
                     "security-severity": _SEVERITY_TO_SECURITY_SEVERITY[finding.severity],
                     "precision": "high",
                     "problem.severity": finding.severity.value,
@@ -78,6 +79,8 @@ def to_sarif(result: ScanResult, config_path: str = "mcp.json") -> dict:
                 "owasp": finding.owasp.value,
                 "server": finding.server_name,
                 "engine": finding.engine,
+                **({"cwe": finding.cwe_id} if finding.cwe_id else {}),
+                **({"attackTactic": finding.attack_tactic} if finding.attack_tactic else {}),
             },
             "fingerprints": {
                 "mcpAudit/v1": f"{result.config_hash}/{finding.check_id}/{finding.server_name}/{i}",

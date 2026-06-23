@@ -71,6 +71,8 @@ class Finding(BaseModel):
     engine: str = "custom"
     # Optional ATT&CK tactic for enterprise report correlation
     attack_tactic: Optional[str] = None
+    # Optional CWE ID (e.g., "CWE-798") for SAST/compliance toolchain integration
+    cwe_id: Optional[str] = None
 
 
 class ScanSummary(BaseModel):

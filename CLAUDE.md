@@ -4,10 +4,10 @@
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
 ## Current State (2026-06-23)
-- **Engine**: 29 check IDs across 10 modules, 78/78 tests passing
+- **Engine**: 33 check IDs across 10 modules, 133/133 tests passing
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js minimal UI with risk grade (A-F) display
-- **Output formats**: JSON, SARIF 2.1.0, CycloneDX 1.6 AI-BOM
+- **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
 - **OWASP coverage**: 10/10 MCP Top 10 categories
 
 ## Project Structure
@@ -23,13 +23,13 @@ apps/api/                  FastAPI backend
     cyclonedx.py           CycloneDX 1.6 AI-BOM output formatter
     checks/
       secrets.py           SEC-001–006 (25+ patterns)
-      supply_chain.py      SC-001–003
+      supply_chain.py      SC-001–003, SC-005
       tool_poisoning.py    PI-001–003, DX-001
       privilege.py         PE-001–004
-      shadow.py            SH-001–003
+      shadow.py            SH-001–005
       code_execution.py    EX-001–002
       osv_lookup.py        SC-004 (OSV.dev live CVE)
-      audit.py             AT-002–003
+      audit.py             AT-002–004
       lifecycle.py         LF-001
       config_level.py      CL-001–002, EC-001
   tests/
@@ -38,6 +38,7 @@ apps/api/                  FastAPI backend
     test_shadow_audit.py   12 shadow/audit/SARIF tests
     test_advanced.py       14 lifecycle/risk-score/CycloneDX tests
     test_config_level.py   8 config-level checks tests
+    test_new_checks.py     34 tests for SH-004/005, SC-005, AT-004, CWE IDs
 packages/cli/              Go CLI binary (NOT YET BUILT — Stage 2)
 ```
 
@@ -81,13 +82,13 @@ All checks mapped to OWASP MCP Top 10:
 | Module | IDs | OWASP |
 |---|---|---|
 | secrets.py | SEC-001–006 | MCP01, MCP04 |
-| supply_chain.py | SC-001–003 | MCP04 |
+| supply_chain.py | SC-001–003, SC-005 | MCP04 |
 | osv_lookup.py | SC-004 | MCP04 |
 | tool_poisoning.py | PI-001–003, DX-001 | MCP03, MCP06 |
 | privilege.py | PE-001–004 | MCP02, MCP05, MCP10 |
-| shadow.py | SH-001–003 | MCP07, MCP09 |
+| shadow.py | SH-001–005 | MCP03, MCP07, MCP09 |
 | code_execution.py | EX-001–002 | MCP05 |
-| audit.py | AT-002–003 | MCP08 |
+| audit.py | AT-002–004 | MCP08 |
 | lifecycle.py | LF-001 | MCP04 |
 | config_level.py | CL-001–002, EC-001 | MCP02, MCP03, MCP01 |
 | scanner.py | AT-001 | MCP08 |

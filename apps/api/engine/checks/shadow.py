@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
 
@@ -46,6 +47,13 @@ _KNOWN_GOOD_PACKAGES: set[str] = {
 # Strip version pin for comparison
 _AT_VERSION_RE = re.compile(r'@[\d.]+$')
 
+# Env var key patterns indicating auto-discovery / dynamic plugin loading (SH-005).
+# Corpus finding: Dezocode's MCP_AUTO_DISCOVERY=true enables silent plugin loading at runtime.
+_AUTO_DISCOVERY_KEY_RE = re.compile(
+    r'(auto_?discover|plugin_?discover|dynamic_?load|server_?discover|tool_?discover)',
+    re.IGNORECASE,
+)
+
 
 def _strip_version(package: str) -> str:
     if package.startswith("@"):
@@ -65,6 +73,14 @@ def _is_known(package: str) -> bool:
     if base.startswith("@"):
         scope = base.split("/")[0]
         if scope in _KNOWN_GOOD_SCOPES:
+            return True
+    return False
+
+
+def _has_non_ascii_letters(text: str) -> bool:
+    """Return True if text contains any non-ASCII Unicode letter (potential homoglyph)."""
+    for char in text:
+        if ord(char) > 127 and unicodedata.category(char).startswith("L"):
             return True
     return False
 
@@ -120,6 +136,7 @@ def check_shadow(server: MCPServer) -> list[Finding]:
                 ),
                 engine="custom",
                 attack_tactic="initial-access",
+                cwe_id="CWE-319",
             ))
 
     # SH-003: Localhost URL paired with remotely-fetched npm package
@@ -143,6 +160,70 @@ def check_shadow(server: MCPServer) -> list[Finding]:
                 ),
                 engine="custom",
             ))
+
+    # SH-004: Unicode homoglyphs in server name (Adversa AI Top 25 #12 — Tool Name Spoofing)
+    # Attackers register servers with names using non-ASCII Unicode letters that are visually
+    # identical to ASCII characters (e.g., Cyrillic 'а' vs Latin 'a'). The server appears
+    # as "filesystem" in the UI but is actually a different identifier routing to a malicious server.
+    if _has_non_ascii_letters(server.name):
+        suspicious_chars = [
+            f"U+{ord(c):04X} ({unicodedata.name(c, 'UNKNOWN')})"
+            for c in server.name if ord(c) > 127 and unicodedata.category(c).startswith("L")
+        ]
+        findings.append(Finding(
+            check_id="SH-004",
+            title=f"Server name contains Unicode homoglyphs: `{server.name}`",
+            detail=(
+                f"Server `{server.name}` contains non-ASCII Unicode letters that may be visually "
+                "indistinguishable from legitimate ASCII server names. "
+                f"Suspicious characters: {', '.join(suspicious_chars[:5])}. "
+                "This is a Tool Name Spoofing attack (Adversa AI Top 25 MCP #12): a malicious server "
+                "registers a name that looks identical to a trusted server (e.g., 'filesystem') but "
+                "routes tool calls to a different, attacker-controlled implementation."
+            ),
+            severity=Severity.HIGH,
+            owasp=OWASPCategory.MCP03,
+            server_name=server.name,
+            remediation=(
+                "Remove this server from your config and investigate its source. "
+                "Legitimate MCP server names use only ASCII characters (a-z, 0-9, hyphens, underscores). "
+                "If you installed this from a third-party source, treat it as potentially malicious."
+            ),
+            engine="custom",
+            attack_tactic="defense-evasion",
+            cwe_id="CWE-1007",
+        ))
+
+    # SH-005: Auto-discovery env var enabling silent plugin loading at runtime
+    # Corpus finding (Dezocode): MCP_AUTO_DISCOVERY=true — binary discovers and loads
+    # arbitrary MCP extensions at startup without explicit user approval for each one.
+    # This is a shadow server attack vector: one trusted server silently loads untrusted ones.
+    for key, value in server.env.items():
+        if _AUTO_DISCOVERY_KEY_RE.search(key) and value.lower() in ("true", "1", "yes", "on", "enabled"):
+            findings.append(Finding(
+                check_id="SH-005",
+                title=f"Auto-discovery env var enables silent plugin loading: `{key}={value}`",
+                detail=(
+                    f"Server `{server.name}` has `{key}={value}` in its environment, "
+                    "which enables automatic discovery and loading of MCP plugins or extensions at runtime. "
+                    "Auto-discovery means the server can silently load additional tool providers that "
+                    "were never explicitly approved in your MCP config — each discovered extension "
+                    "gains the same access level as the parent server."
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP09,
+                server_name=server.name,
+                remediation=(
+                    f"Set `{key}=false` or remove the env var entirely. "
+                    "All MCP servers and tool providers should be explicitly listed in your config "
+                    "so you have full visibility over what has access to your AI assistant. "
+                    "If auto-discovery is required by this server, audit every extension it loads."
+                ),
+                engine="custom",
+                attack_tactic="persistence",
+                cwe_id="CWE-284",
+            ))
+            break  # One SH-005 per server is sufficient
 
     return findings
 

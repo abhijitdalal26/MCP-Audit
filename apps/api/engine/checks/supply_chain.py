@@ -133,6 +133,38 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
                     "Check the package's GitHub repo for source code and maintainer history."
                 ),
                 engine="custom",
+                cwe_id="CWE-829",
             ))
+
+    # SC-005: GitHub ref dependency — bypasses npm registry and audit trail
+    # Pattern: npx github:user/repo or npm install github:user/repo
+    # These pull directly from a GitHub branch/commit, not a versioned npm release.
+    # No npm audit, no integrity hash, no changelog enforcement — any push to that
+    # branch silently changes what code runs (rug pull via git force-push).
+    if package.startswith("github:") or package.startswith("bitbucket:") or package.startswith("gitlab:"):
+        host = package.split(":")[0]
+        findings.append(Finding(
+            check_id="SC-005",
+            title=f"Direct {host.capitalize()} ref dependency: `{package}`",
+            detail=(
+                f"Server `{server.name}` installs `{package}` directly from {host.capitalize()}, "
+                "bypassing the npm registry entirely. "
+                "This means: no npm audit trail, no integrity hash verification, no locked version. "
+                "A maintainer can force-push to that branch and silently change what code runs "
+                "on your machine the next time the MCP server starts (rug pull attack)."
+            ),
+            severity=Severity.HIGH,
+            owasp=OWASPCategory.MCP04,
+            server_name=server.name,
+            remediation=(
+                f"Replace `{package}` with a published npm package version if the author has one. "
+                "If you must use a git ref, pin to a specific commit SHA "
+                f"(e.g., `github:user/repo#abc1234`) and verify the commit before pinning. "
+                "Consider forking the repo to your own account to control when updates are pulled."
+            ),
+            engine="custom",
+            attack_tactic="initial-access",
+            cwe_id="CWE-829",
+        ))
 
     return findings
