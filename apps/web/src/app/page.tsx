@@ -45,6 +45,14 @@ const SEVERITY_LEFT: Record<string, string> = {
   info: "border-l-gray-500",
 }
 
+const GRADE_COLOR: Record<string, string> = {
+  A: "text-green-400",
+  B: "text-emerald-400",
+  C: "text-yellow-400",
+  D: "text-orange-400",
+  F: "text-red-400",
+}
+
 interface Finding {
   check_id: string
   title: string
@@ -53,6 +61,7 @@ interface Finding {
   owasp: string
   server_name: string
   remediation: string
+  attack_tactic?: string
 }
 
 interface ScanResult {
@@ -68,6 +77,8 @@ interface ScanResult {
     info: number
     servers_scanned: number
     owasp_coverage: string[]
+    risk_score: number
+    risk_grade: string
   }
   scanned_at: string
 }
@@ -193,19 +204,30 @@ export default function Home() {
           <div className="space-y-5">
             {/* Summary */}
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-300 font-medium">
-                  {result.summary.servers_scanned} server{result.summary.servers_scanned !== 1 ? "s" : ""} scanned
-                  {result.summary.total > 0 && (
-                    <span className="text-gray-600 ml-2">·</span>
-                  )}
-                  {result.summary.total > 0 && (
-                    <span className="text-gray-500 ml-2">
-                      {result.summary.total} finding{result.summary.total !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                </span>
-                <span className="text-xs font-mono text-gray-700">{result.config_hash}</span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="text-sm text-gray-300 font-medium">
+                    {result.summary.servers_scanned} server{result.summary.servers_scanned !== 1 ? "s" : ""} scanned
+                    {result.summary.total > 0 && (
+                      <>
+                        <span className="text-gray-600 mx-2">·</span>
+                        <span className="text-gray-500">
+                          {result.summary.total} finding{result.summary.total !== 1 ? "s" : ""}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-xs font-mono text-gray-700">{result.config_hash}</span>
+                </div>
+                {/* Risk grade */}
+                <div className="text-right shrink-0">
+                  <div className={`text-3xl font-black leading-none ${GRADE_COLOR[result.summary.risk_grade] ?? "text-gray-400"}`}>
+                    {result.summary.risk_grade}
+                  </div>
+                  <div className="text-xs text-gray-700 mt-1">
+                    risk score {result.summary.risk_score}/100
+                  </div>
+                </div>
               </div>
 
               {result.summary.total === 0 ? (
@@ -226,7 +248,7 @@ export default function Home() {
 
               {result.summary.owasp_coverage.length > 0 && (
                 <p className="text-xs text-gray-700">
-                  OWASP MCP categories: {result.summary.owasp_coverage.join(", ")}
+                  OWASP MCP: {result.summary.owasp_coverage.join(", ")}
                 </p>
               )}
             </div>
@@ -254,6 +276,12 @@ export default function Home() {
                           <span>{f.owasp}</span>
                           <span className="mx-1.5">·</span>
                           <span className="font-mono text-gray-700">{f.server_name}</span>
+                          {f.attack_tactic && (
+                            <>
+                              <span className="mx-1.5">·</span>
+                              <span className="text-gray-700">ATT&amp;CK: {f.attack_tactic}</span>
+                            </>
+                          )}
                         </p>
                       </div>
                       <span className="text-gray-700 text-xs shrink-0 pt-1">
