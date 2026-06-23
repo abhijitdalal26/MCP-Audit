@@ -44,6 +44,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local Obsidian research vault — never push
+documentaion/
+
 # OS
 .DS_Store
 Thumbs.db
