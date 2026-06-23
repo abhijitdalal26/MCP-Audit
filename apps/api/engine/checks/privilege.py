@@ -70,6 +70,22 @@ _PERMISSION_BYPASS_FLAGS: set[str] = {
     "--no-permissions",
 }
 
+# PE-009: Specific dangerous Linux capabilities via --cap-add
+# SYS_ADMIN, SYS_PTRACE, and friends each enable different container breakout paths.
+# PE-005 catches the blunt instruments (--privileged, --cap-add=all);
+# PE-009 catches targeted capability grants that are equally dangerous but less obvious.
+# Sources: CVE-2022-0492 (cgroup escape via SYS_ADMIN); BH USA 2019 (ptrace memory injection);
+#          Trail of Bits "Understanding and Hardening Linux Containers" (2019).
+_DOCKER_DANGEROUS_CAPS: dict[str, str] = {
+    "sys_admin": "enables mount/cgroup/ioctl — used in CVE-2022-0492 Docker cgroup escape and multiple container breakouts",
+    "sys_ptrace": "traces and modifies any process memory — enables container breakout via nsenter or memory injection",
+    "net_admin": "manipulates host network stack, routing, and firewall rules — can intercept or redirect all traffic",
+    "dac_override": "bypasses UNIX file permission bits — can read/write any file as if running as root",
+    "dac_read_search": "bypasses read/execute permission checks — can traverse and read any directory or file",
+    "sys_module": "loads arbitrary kernel modules — direct kernel code execution, effectively root",
+    "sys_rawio": "raw block device I/O — can read/write disk sectors directly, bypassing filesystem permissions",
+}
+
 _ADMIN_ENV_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("PE-003", re.compile(r'(?i)(sudo_password|root_token|root_password|admin_key|admin_password|admin_token)')),
     ("PE-003", re.compile(r'(?i)(master_key|super_admin|superuser_password|master_password)')),
@@ -415,5 +431,49 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                 cwe_id="CWE-284",
             ))
             break  # One PE-007 per server
+
+    # PE-009: Individual dangerous Linux capability grants via --cap-add
+    # PE-005 already catches --privileged and --cap-add=all; this catches targeted cap grants
+    # that are each sufficient for a container breakout but are missed by the broad-flag check.
+    if _docker_cmd == "docker":
+        args_lower_list = [a.lower() for a in server.args]
+        if "run" in args_lower_list:
+            i = 0
+            while i < len(server.args):
+                arg_l = args_lower_list[i]
+                cap_raw: str | None = None
+                if arg_l.startswith("--cap-add="):
+                    cap_raw = arg_l.removeprefix("--cap-add=").strip()
+                elif arg_l == "--cap-add" and i + 1 < len(server.args):
+                    cap_raw = args_lower_list[i + 1].strip()
+                if cap_raw is not None:
+                    # Linux caps may be written as CAP_SYS_ADMIN or SYS_ADMIN
+                    cap_key = cap_raw.removeprefix("cap_")
+                    if cap_key in _DOCKER_DANGEROUS_CAPS:
+                        risk = _DOCKER_DANGEROUS_CAPS[cap_key]
+                        findings.append(Finding(
+                            check_id="PE-009",
+                            title=f"Docker container grants dangerous Linux capability: `{cap_raw.upper()}`",
+                            detail=(
+                                f"Server `{server.name}` adds the `{cap_raw.upper()}` Linux capability to its "
+                                f"Docker container via `--cap-add`. Risk: {risk}. "
+                                "Each of these capabilities independently enables known container breakout "
+                                "techniques — attackers only need one to escape the container and reach the host."
+                            ),
+                            severity=Severity.HIGH,
+                            owasp=OWASPCategory.MCP02,
+                            server_name=server.name,
+                            remediation=(
+                                f"Remove `--cap-add={cap_raw.upper()}` from the Docker run command. "
+                                "Start with `--cap-drop=ALL` and add only the minimum capabilities the "
+                                "server actually requires (run `man 7 capabilities` for the full list). "
+                                "Most MCP server workloads need zero additional capabilities."
+                            ),
+                            engine="custom",
+                            attack_tactic="privilege-escalation",
+                            cwe_id="CWE-250",
+                        ))
+                        break  # One PE-009 per server
+                i += 1
 
     return findings

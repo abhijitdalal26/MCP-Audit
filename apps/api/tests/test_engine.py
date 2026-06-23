@@ -632,3 +632,112 @@ class TestExpandedMaliciousPackages:
         )
         findings = check_supply_chain(server)
         assert not any(f.check_id == "SC-001" for f in findings)
+
+
+class TestDockerDangerousCaps:
+    """PE-009: Individual dangerous Linux capability grants via --cap-add."""
+
+    def test_cap_sys_admin_equals_form(self):
+        """--cap-add=SYS_ADMIN should fire PE-009 (enables cgroup escape CVE-2022-0492)."""
+        server = make_server(
+            command="docker",
+            args=["run", "--cap-add=SYS_ADMIN", "-p", "3000:3000", "myimage:1.0"],
+        )
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-009" for f in findings)
+
+    def test_cap_sys_ptrace_space_form(self):
+        """--cap-add SYS_PTRACE (space-separated) should fire PE-009."""
+        server = make_server(
+            command="docker",
+            args=["run", "--cap-add", "SYS_PTRACE", "myimage:1.0"],
+        )
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-009" for f in findings)
+
+    def test_cap_prefix_form(self):
+        """CAP_SYS_MODULE (with CAP_ prefix) should also fire PE-009."""
+        server = make_server(
+            command="docker",
+            args=["run", "--cap-add=CAP_SYS_MODULE", "myimage:1.0"],
+        )
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-009" for f in findings)
+
+    def test_cap_net_admin_detected(self):
+        """NET_ADMIN capability (host network manipulation) fires PE-009."""
+        server = make_server(
+            command="docker",
+            args=["run", "--cap-add=NET_ADMIN", "myimage:1.0"],
+        )
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-009" for f in findings)
+
+    def test_safe_cap_not_flagged(self):
+        """--cap-add=CHOWN (benign capability) must NOT fire PE-009."""
+        server = make_server(
+            command="docker",
+            args=["run", "--cap-add=CHOWN", "myimage:1.0"],
+        )
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-009" for f in findings)
+
+    def test_no_docker_not_flagged(self):
+        """Non-Docker server should never trigger PE-009."""
+        server = make_server(
+            command="npx",
+            args=["-y", "--cap-add=SYS_ADMIN"],  # looks like a docker flag but wrong command
+        )
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-009" for f in findings)
+
+
+class TestCredentialsInURL:
+    """SEC-008: Credentials embedded in the server url: field."""
+
+    def test_basic_auth_in_url_flagged(self):
+        """https://user:password@host should fire SEC-008."""
+        from engine.checks.secrets import check_secrets
+        server = make_server(
+            command=None,
+            url="https://admin:supersecretpassword@api.company.com/mcp",
+        )
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-008" for f in findings)
+
+    def test_aws_key_in_url_flagged(self):
+        """AWS access key embedded in URL query param should fire SEC-008."""
+        from engine.checks.secrets import check_secrets
+        server = make_server(
+            command=None,
+            url="https://api.company.com/mcp?key=AKIAIOSFODNN7EXAMPLE1234",
+        )
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-008" for f in findings)
+
+    def test_clean_url_not_flagged(self):
+        """URL with no credentials must not fire SEC-008."""
+        from engine.checks.secrets import check_secrets
+        server = make_server(
+            command=None,
+            url="https://api.company.com/mcp",
+        )
+        findings = check_secrets(server)
+        assert not any(f.check_id == "SEC-008" for f in findings)
+
+    def test_placeholder_url_not_flagged(self):
+        """URL with a placeholder value (${URL}) must not fire SEC-008."""
+        from engine.checks.secrets import check_secrets
+        server = make_server(
+            command=None,
+            url="${MCP_SERVER_URL}",
+        )
+        findings = check_secrets(server)
+        assert not any(f.check_id == "SEC-008" for f in findings)
+
+    def test_none_url_not_flagged(self):
+        """Server with no url: field must not crash or fire SEC-008."""
+        from engine.checks.secrets import check_secrets
+        server = make_server(command="npx", args=["-y", "@modelcontextprotocol/server-filesystem"])
+        findings = check_secrets(server)
+        assert not any(f.check_id == "SEC-008" for f in findings)

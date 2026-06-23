@@ -11,6 +11,7 @@ _CHECK_CWE: dict[str, str] = {
     "SEC-005": "CWE-312",   # Cleartext Storage of Sensitive Information (JWT/SSH keys)
     "SEC-006": "CWE-1104",  # Use of Unmaintained Third Party Components (unpinned)
     "SEC-007": "CWE-918",   # Server-Side Request Forgery (cloud metadata endpoint)
+    "SEC-008": "CWE-312",   # Cleartext Storage of Sensitive Information (credentials in URL)
 }
 
 # (check_id, human title, compiled regex, severity)
@@ -206,6 +207,42 @@ def check_secrets(server: MCPServer) -> list[Finding]:
                     cwe_id=_CHECK_CWE.get(check_id, "CWE-214"),
                 ))
                 break
+
+    # SEC-008: Credentials embedded in the server `url:` field
+    # The url: field is used by HTTP/SSE MCP servers. If credentials are embedded
+    # in the URL (e.g., https://user:pass@api.example.com/mcp) or added as query params,
+    # those creds appear in access logs, proxy logs, browser history, and any system
+    # that records the config file. No other check currently covers the url: field.
+    if server.url and not _PLACEHOLDER_RE.match(server.url):
+        for check_id, title, pattern, severity in _VALUE_PATTERNS:
+            dedup = f"SEC-008:{server.name}:url:{check_id}"
+            if dedup not in seen and pattern.search(server.url):
+                seen.add(dedup)
+                findings.append(Finding(
+                    check_id="SEC-008",
+                    title=f"{title} embedded in server URL",
+                    detail=(
+                        f"Server `{server.name}` has what appears to be a {title.lower()} "
+                        f"embedded directly in its `url` field (`{_mask(server.url)}`). "
+                        "Credentials in URLs are recorded by web servers, proxies, and load balancers; "
+                        "appear in browser history if the URL is opened; and are visible to anyone "
+                        "who reads the MCP config file. MCP configs are frequently synced via "
+                        "cloud backup (iCloud, Google Drive) or accidentally committed to git."
+                    ),
+                    severity=severity,
+                    owasp=OWASPCategory.MCP01,
+                    server_name=server.name,
+                    remediation=(
+                        "Move the credential out of the URL and into a dedicated environment variable. "
+                        "Most API providers accept tokens via a header (e.g., `Authorization: Bearer $TOKEN`) "
+                        "rather than requiring them in the URL. "
+                        "Reference the variable with `$ENV_VAR` syntax so the plaintext never appears "
+                        "in the config file."
+                    ),
+                    engine="custom",
+                    cwe_id="CWE-312",
+                ))
+                break  # One SEC-008 per server
 
     # SEC-006: Unpinned package versions (rug pull risk)
     for arg in server.args:
