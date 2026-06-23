@@ -1,135 +1,105 @@
-# MCPAudit — MCP Security Platform
+# MCPAudit
 
-> Paste your MCP config. Get a security report in 30 seconds.
-
-MCPAudit audits Model Context Protocol (MCP) server configurations for security vulnerabilities — secrets exposure, supply chain risks, privilege escalation, prompt injection, and more — with every finding mapped to the **OWASP MCP Top 10**.
+Security auditor for Model Context Protocol (MCP) server configurations. Paste your `claude_desktop_config.json` or `.cursor/mcp.json` — get a unified security report with every finding mapped to the **OWASP MCP Top 10**.
 
 ---
 
-## The Problem
+## What It Does
 
-Every time you add an MCP server to Claude Desktop, Cursor, or Windsurf, you're granting that server access to your filesystem, shell, browser, or APIs. Most people paste the config JSON from a README without knowing what they're actually trusting.
+Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit checks your config before you trust anything.
 
-The numbers make this urgent:
-- **8,000+** publicly exposed MCP servers with no authentication (Censys, 2026)
-- **40+ CVEs** filed against MCP implementations in the first 60 days of 2026
-- **106 zero-days** found across 39,884 MCP repositories (academic study)
-- **150M+** affected downloads across vulnerable MCP packages
-- NSA, DoD, and OWASP have all published formal MCP security guidance in 2026
-- The 4 existing open-source audit tools have no web UI and ~78% false positive rates
+**33 checks across 10 modules:**
 
----
+| Module | Check IDs | Category |
+|--------|-----------|----------|
+| `secrets.py` | SEC-001–006 | Hardcoded credentials, API keys, tokens |
+| `supply_chain.py` | SC-001–003, SC-005 | Malicious/typosquatted packages, GitHub ref deps |
+| `osv_lookup.py` | SC-004 | Live CVE lookup via OSV.dev |
+| `tool_poisoning.py` | PI-001–003, DX-001 | Prompt injection, data exfiltration patterns |
+| `privilege.py` | PE-001–004 | Overbroad filesystem, shell access, admin creds |
+| `shadow.py` | SH-001–005 | Unregistered servers, HTTP, homoglyphs, auto-discovery |
+| `code_execution.py` | EX-001–002 | Inline code execution, command substitution |
+| `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
+| `lifecycle.py` | LF-001 | Postinstall script abuse |
+| `config_level.py` | CL-001–002, EC-001 | Config-wide issues, duplicate servers |
+| `scanner.py` | AT-001 | Version pinning audit |
 
-## What MCPAudit Does
-
-Paste your `claude_desktop_config.json` or `.cursor/mcp.json` — get a unified, actionable security report in under 30 seconds. No install required for the free tier.
-
-### 20 Security Checks Across 5 Categories
-
-| Category | Checks | OWASP Mapping |
-|----------|--------|---------------|
-| **Secrets & Credentials** | AWS keys, GitHub PATs, database URLs, API keys, JWT secrets, unpinned versions | MCP01 |
-| **Supply Chain** | CVE scan via OSV.dev, typosquatting detection, unverified packages, known-malicious packages | MCP04 |
-| **Tool Poisoning & Prompt Injection** | Suspicious tool description keywords, hidden instructions, excessively long descriptions | MCP03, MCP06 |
-| **Privilege Escalation** | Over-broad filesystem access, shell execution, admin credential patterns, DB write access | MCP02, MCP07 |
-| **Shadow Servers** | Unregistered servers, HTTP without TLS, package/transport mismatch | MCP09 |
+All findings include severity, OWASP MCP Top 10 category, CWE ID, MITRE ATT&CK tactic, and remediation guidance.
 
 ---
 
-## Who It's For
+## Output Formats
 
-| Audience | Problem | Solution |
-|----------|---------|----------|
-| **AI tool users** (Claude Desktop, Cursor, Windsurf) | "Is this MCP server safe to install?" | Paste-and-scan in 30 seconds, no account needed |
-| **MCP server builders** | "Is my server safe to publish?" | Pre-publish audit + OWASP compliance report + security badge |
-| **Security teams** | "What do our developers have installed?" | Team dashboard + GitHub Action CI gate + SARIF output |
+- **JSON** — full scan result with all findings
+- **SARIF 2.1.0** — GitHub Security tab compatible (uploads as code scanning alerts)
+- **CycloneDX 1.6 AI-BOM** — supply chain compliance
+
+---
+
+## API Endpoints
+
+```
+POST /scan          → JSON report
+POST /scan/sarif    → SARIF 2.1.0
+POST /scan/bom      → CycloneDX 1.6 AI-BOM
+```
+
+**Request body:**
+```json
+{ "config": "{ \"mcpServers\": { ... } }" }
+```
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Web App (Next.js 15)  │  CLI (Go)  │  GitHub Action │
-└──────────────┬──────────────────────────────────────┘
-               │
-       FastAPI Backend (Python 3.12)
-               │
-    ┌──────────┴──────────┐
-    │    Scan Engines      │
-    ├──────────────────────┤
-    │  mcp-audit (APIsec)  │  secrets, API inventory
-    │  tooltrust (AgentSafe)│  supply chain, 16 rules
-    │  Custom checks        │  OWASP MCP Top 10 coverage
-    └──────────────────────┘
-               │
-    Inngest (async job queue) → Supabase (results + history)
+apps/web/           Next.js 15 frontend (minimal scan UI)
+apps/api/           FastAPI backend
+  main.py           API entrypoint
+  engine/
+    parser.py       JSONC-aware config parser (Claude Desktop + Cursor formats)
+    scanner.py      Scan orchestrator
+    models.py       Pydantic models (Finding, ScanResult, ScanSummary)
+    sarif.py        SARIF 2.1.0 formatter
+    cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
+    checks/         33 check implementations
+  tests/            133 tests (unit + property-based + real-world corpus)
+packages/cli/       Go CLI binary (planned)
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Reason |
-|-------|-----------|--------|
-| Frontend | Next.js 15 + Shadcn/ui + Tailwind | Ecosystem + zero-DevOps Vercel deploy |
-| Backend | FastAPI (Python 3.12) | Native to Python scan tools |
-| Auth | Clerk | 30-min setup, org/team + API keys built-in |
-| Database | Supabase (PostgreSQL) | Row Level Security for org isolation |
-| Job Queue | Inngest | Serverless-native, no Redis to manage |
-| CLI | Go (single static binary) | No runtime dependency, cross-platform |
-| CI Integration | GitHub Actions Marketplace | Native SARIF → GitHub Security tab |
-| Payments | Stripe | Standard |
-| Hosting | Vercel (frontend) + Railway (API) | Zero DevOps for MVP |
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15 + App Router + Tailwind |
+| Backend | FastAPI (Python 3.12) + Pydantic v2 |
+| CVE data | OSV.dev API (Google-maintained, no API key) |
+| SARIF | 2.1.0 spec — GitHub Security tab compatible |
+| AI-BOM | CycloneDX 1.6 |
 
 ---
 
-## Project Structure
+## Running Locally
 
-```
-mcpaudit/
-├── apps/
-│   ├── web/              # Next.js 15 frontend
-│   └── api/              # FastAPI backend (scan orchestrator)
-├── packages/
-│   ├── cli/              # Go CLI binary (cross-platform)
-│   └── scan-engine/      # Core Python scan engine
-├── .github/
-│   ├── workflows/        # CI/CD pipelines
-│   └── ISSUE_TEMPLATE/   # Bug report & feature request templates
-├── docs/
-│   └── research/         # Pre-build research (competitive analysis, tech decisions)
-├── CLAUDE.md
-└── README.md
+```bash
+# API
+cd apps/api
+python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
+uvicorn main:app --reload --port 8000
+
+# Tests (133/133)
+.venv/Scripts/pytest tests/ -v
+
+# Frontend
+cd apps/web
+npm install && npm run dev   # → http://localhost:3000
 ```
 
 ---
 
-## Roadmap
+## OWASP MCP Top 10 Coverage
 
-| Stage | Scope | Timeline |
-|-------|-------|----------|
-| **1 — MVP** | Web paste-and-scan, OWASP-mapped report, shareable links, no account needed | Month 1–3 |
-| **2 — CLI + CI** | Go CLI (`npx mcpaudit scan`), GitHub Action, auth, scan history | Month 3–6 |
-| **3 — Teams** | Team dashboard, Stripe subscriptions (Free/Pro/Team), scheduled scans, Slack alerts | Month 6–9 |
-| **4 — Triage** | LLM-assisted false-positive reduction (Claude API, from ~78% FP to near 0%) | Month 9–15 |
-| **5 — Enterprise** | On-prem agent, SIEM integration, SAML SSO, custom check rules, compliance reports | Month 15+ |
-
----
-
-## Pricing (Planned)
-
-| Tier | Price | Key Limits |
-|------|-------|-----------|
-| Free | $0 | 10 scans/month, no account needed, JSON report |
-| Pro | $25/mo | Unlimited scans, scan history, CLI + CI access, SARIF export |
-| Team | $99/mo | Org dashboard, scheduled scans, Slack alerts, SAML SSO |
-| Enterprise | Custom | On-prem agent, SLA, SIEM, custom rules |
-
----
-
-## Status
-
-**Pre-build — research complete, development starting.**
-
-Full pre-build research (competitive analysis, naming, tech stack decisions, feature specs, development plan) lives in [`docs/research/`](docs/research/).
+All 10 categories covered: MCP01 (Token Mismanagement) · MCP02 (Privilege Escalation) · MCP03 (Tool Poisoning) · MCP04 (Supply Chain) · MCP05 (Command Injection) · MCP06 (Prompt Injection) · MCP07 (Insufficient Auth) · MCP08 (Audit & Telemetry) · MCP09 (Shadow Servers) · MCP10 (Context Over-Sharing)
