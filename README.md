@@ -1,38 +1,45 @@
 # MCPAudit
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-168%20passing-brightgreen)](apps/api/tests/)
+[![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
+[![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
+
 Security auditor for Model Context Protocol (MCP) server configurations. Paste your `claude_desktop_config.json` or `.cursor/mcp.json` — get a unified security report with every finding mapped to the **OWASP MCP Top 10**.
 
 ---
 
 ## What It Does
 
-Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit checks your config before you trust anything.
+Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**33 checks across 10 modules:**
+**37 checks across 10 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
-| `secrets.py` | SEC-001–006 | Hardcoded credentials, API keys, tokens |
+| `secrets.py` | SEC-001–006 | Hardcoded credentials, API keys, tokens, HTTP basic auth |
 | `supply_chain.py` | SC-001–003, SC-005 | Malicious/typosquatted packages, GitHub ref deps |
 | `osv_lookup.py` | SC-004 | Live CVE lookup via OSV.dev |
-| `tool_poisoning.py` | PI-001–003, DX-001 | Prompt injection, data exfiltration patterns |
-| `privilege.py` | PE-001–004 | Overbroad filesystem, shell access, admin creds |
+| `tool_poisoning.py` | PI-001–004, DX-001 | Prompt injection, obfuscation, data exfiltration |
+| `privilege.py` | PE-001–005 | Overbroad filesystem, shell access, Docker privilege escalation |
 | `shadow.py` | SH-001–005 | Unregistered servers, HTTP, homoglyphs, auto-discovery |
 | `code_execution.py` | EX-001–002 | Inline code execution, command substitution |
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
 | `lifecycle.py` | LF-001 | Postinstall script abuse |
-| `config_level.py` | CL-001–002, EC-001 | Config-wide issues, duplicate servers |
-| `scanner.py` | AT-001 | Version pinning audit |
+| `config_level.py` | CL-001–002, EC-001 | Confused deputy, duplicate servers, debug log exposure |
+| `scanner.py` | AT-001, AT-005 | Version pinning audit, excessive server count |
 
-All findings include severity, OWASP MCP Top 10 category, CWE ID, MITRE ATT&CK tactic, and remediation guidance.
+Every finding includes: severity, OWASP MCP Top 10 category, CWE ID, MITRE ATT&CK tactic, and remediation guidance.
 
 ---
 
 ## Output Formats
 
-- **JSON** — full scan result with all findings
-- **SARIF 2.1.0** — GitHub Security tab compatible (uploads as code scanning alerts)
-- **CycloneDX 1.6 AI-BOM** — supply chain compliance
+| Format | Use Case |
+|--------|----------|
+| **JSON** | CI/CD integration, programmatic processing |
+| **SARIF 2.1.0** | GitHub Security tab (uploads as code scanning alerts) |
+| **CycloneDX 1.6 AI-BOM** | Supply chain compliance, SBOM workflows |
 
 ---
 
@@ -49,6 +56,32 @@ POST /scan/bom      → CycloneDX 1.6 AI-BOM
 { "config": "{ \"mcpServers\": { ... } }" }
 ```
 
+**Example response:**
+```json
+{
+  "scan_id": "abc123",
+  "summary": {
+    "total": 4,
+    "critical": 1,
+    "high": 2,
+    "medium": 1,
+    "risk_score": 47,
+    "risk_grade": "C",
+    "owasp_coverage": ["MCP01", "MCP04", "MCP09"]
+  },
+  "findings": [
+    {
+      "check_id": "SEC-001",
+      "title": "AWS Access Key ID hardcoded in `AWS_ACCESS_KEY_ID`",
+      "severity": "critical",
+      "owasp": "MCP01",
+      "cwe_id": "CWE-798",
+      "remediation": "..."
+    }
+  ]
+}
+```
+
 ---
 
 ## Architecture
@@ -59,13 +92,13 @@ apps/api/           FastAPI backend
   main.py           API entrypoint
   engine/
     parser.py       JSONC-aware config parser (Claude Desktop + Cursor formats)
-    scanner.py      Scan orchestrator
+    scanner.py      Scan orchestrator + config-level checks
     models.py       Pydantic models (Finding, ScanResult, ScanSummary)
-    sarif.py        SARIF 2.1.0 formatter
+    sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
-    checks/         33 check implementations
-  tests/            133 tests (unit + property-based + real-world corpus)
-packages/cli/       Go CLI binary (planned)
+    checks/         37 check implementations
+  tests/            168 tests (unit + property-based + real-world corpus)
+packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
 ---
@@ -76,7 +109,7 @@ packages/cli/       Go CLI binary (planned)
 |-------|-----------|
 | Frontend | Next.js 15 + App Router + Tailwind |
 | Backend | FastAPI (Python 3.12) + Pydantic v2 |
-| CVE data | OSV.dev API (Google-maintained, no API key) |
+| CVE data | OSV.dev API (Google-maintained, no API key needed) |
 | SARIF | 2.1.0 spec — GitHub Security tab compatible |
 | AI-BOM | CycloneDX 1.6 |
 
@@ -87,19 +120,50 @@ packages/cli/       Go CLI binary (planned)
 ```bash
 # API
 cd apps/api
-python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
+python -m venv .venv
+.venv/Scripts/pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
 
-# Tests (133/133)
-.venv/Scripts/pytest tests/ -v
+# Tests
+.venv/Scripts/pytest tests/ -v    # 168 tests
 
 # Frontend
 cd apps/web
-npm install && npm run dev   # → http://localhost:3000
+npm install && npm run dev         # → http://localhost:3000
 ```
 
 ---
 
 ## OWASP MCP Top 10 Coverage
 
-All 10 categories covered: MCP01 (Token Mismanagement) · MCP02 (Privilege Escalation) · MCP03 (Tool Poisoning) · MCP04 (Supply Chain) · MCP05 (Command Injection) · MCP06 (Prompt Injection) · MCP07 (Insufficient Auth) · MCP08 (Audit & Telemetry) · MCP09 (Shadow Servers) · MCP10 (Context Over-Sharing)
+All 10 categories covered:
+
+| Category | Description | Checks |
+|----------|-------------|--------|
+| MCP01 | Token Mismanagement & Secret Exposure | SEC-001–006, EC-001 |
+| MCP02 | Privilege Escalation via Scope Creep | PE-001–004, CL-001 |
+| MCP03 | Tool Poisoning | PI-001–004, DX-001, SH-004, CL-002 |
+| MCP04 | Supply Chain Attacks | SC-001–005, LF-001 |
+| MCP05 | Command Injection & Execution | EX-001–002, PE-005 |
+| MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
+| MCP07 | Insufficient Authentication | SH-002 |
+| MCP08 | Lack of Audit and Telemetry | AT-001–005 |
+| MCP09 | Shadow MCP Servers | SH-001, SH-003, SH-005 |
+| MCP10 | Context Injection & Over-Sharing | PE-004 |
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Before submitting a new check:
+
+1. Identify the OWASP MCP Top 10 category it maps to
+2. Write tests first (check the existing test structure in `apps/api/tests/`)
+3. Keep false-positive rate low — include at least one "should not flag" test case
+4. Add a CWE ID and remediation guidance to the Finding
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
