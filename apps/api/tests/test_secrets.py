@@ -98,6 +98,28 @@ class TestUnpinnedVersions:
         ids = [f.check_id for f in findings]
         assert "SEC-006" not in ids
 
+    def test_latest_tag_flagged_as_unpinned(self):
+        """@latest is a dist-tag, not a version pin — rug pull risk."""
+        server = make_server(args=["-y", "@modelcontextprotocol/server-filesystem@latest"])
+        findings = check_secrets(server)
+        ids = [f.check_id for f in findings]
+        assert "SEC-006" in ids
+
+    def test_next_tag_flagged_as_unpinned(self):
+        server = make_server(args=["-y", "some-package@next"])
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-006" for f in findings)
+
+    def test_beta_tag_flagged_as_unpinned(self):
+        server = make_server(args=["-y", "some-package@beta"])
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-006" for f in findings)
+
+    def test_exact_semver_not_flagged(self):
+        server = make_server(args=["-y", "some-package@2.3.1"])
+        findings = check_secrets(server)
+        assert not any(f.check_id == "SEC-006" for f in findings)
+
 
 class TestSecretsInArgs:
     """Secrets passed as CLI arg values (not env vars) are also detected."""

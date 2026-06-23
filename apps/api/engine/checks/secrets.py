@@ -211,13 +211,29 @@ def check_secrets(server: MCPServer) -> list[Finding]:
     return findings
 
 
+_DIST_TAG_RE = re.compile(r'^(latest|next|beta|alpha|canary|rc|nightly|stable|dev|edge|experimental)$', re.I)
+_SEMVER_START_RE = re.compile(r'^\d+\.')
+
+
 def _is_package_arg(arg: str) -> bool:
     if arg.startswith("-"):
         return False
     return arg.startswith("@") or ("/" not in arg and not arg.startswith("/") and not arg.startswith("C:\\"))
 
 
-def _is_pinned(arg: str) -> bool:
+def _extract_version_tag(arg: str) -> str | None:
+    """Return the version/tag string in package@version, or None if no version."""
     if arg.startswith("@"):
-        return arg.count("@") >= 2
-    return "@" in arg
+        parts = arg.split("@")
+        return parts[2] if len(parts) >= 3 and parts[2] else None
+    return arg.split("@")[1] if "@" in arg else None
+
+
+def _is_pinned(arg: str) -> bool:
+    """True only if the package is pinned to a specific semver (not a dist-tag like @latest)."""
+    version = _extract_version_tag(arg)
+    if version is None:
+        return False
+    if _DIST_TAG_RE.match(version):
+        return False  # @latest, @next, @beta etc. are NOT pinned
+    return bool(_SEMVER_START_RE.match(version))  # must start with digits (semver)
