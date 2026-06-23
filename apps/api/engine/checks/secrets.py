@@ -154,6 +154,39 @@ def check_secrets(server: MCPServer) -> list[Finding]:
                     ))
                     break
 
+    # Scan args for embedded secrets (--api-key sk-abc123 pattern)
+    # Some servers accept credentials as CLI flags, which is equally dangerous
+    for i, arg in enumerate(server.args):
+        if not arg or arg.startswith("-") or _PLACEHOLDER_RE.match(arg):
+            continue
+        for check_id, title, pattern, severity in _VALUE_PATTERNS:
+            dedup = f"{check_id}:{server.name}:arg:{i}:val"
+            if dedup in seen:
+                continue
+            if pattern.search(arg):
+                seen.add(dedup)
+                findings.append(Finding(
+                    check_id=check_id,
+                    title=f"{title} hardcoded in command args",
+                    detail=(
+                        f"Server `{server.name}` has what appears to be a {title.lower()} "
+                        f"hardcoded directly in the command args (arg #{i+1}: `{_mask(arg)}`). "
+                        "Credentials passed as command-line arguments appear in process listings, "
+                        "shell history, and are readable by anyone with file system access to the config."
+                    ),
+                    severity=severity,
+                    owasp=OWASPCategory.MCP01,
+                    server_name=server.name,
+                    remediation=(
+                        f"Move the {title.lower()} to an environment variable instead. "
+                        "Replace the inline value with an env var reference (e.g., `$API_KEY`) "
+                        "so the plaintext never appears in the config or process table."
+                    ),
+                    engine="custom",
+                    cwe_id="CWE-214",
+                ))
+                break
+
     # SEC-006: Unpinned package versions (rug pull risk)
     for arg in server.args:
         if _is_package_arg(arg) and not _is_pinned(arg):

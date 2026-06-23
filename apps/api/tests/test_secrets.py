@@ -97,3 +97,62 @@ class TestUnpinnedVersions:
         findings = check_secrets(server)
         ids = [f.check_id for f in findings]
         assert "SEC-006" not in ids
+
+
+class TestSecretsInArgs:
+    """Secrets passed as CLI arg values (not env vars) are also detected."""
+
+    def test_aws_key_in_args_detected(self):
+        server = make_server(
+            command="npx",
+            args=["-y", "some-server", "AKIAIOSFODNN7EXAMPLE"],
+        )
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-001" for f in findings)
+
+    def test_github_pat_in_args_detected(self):
+        server = make_server(
+            command="npx",
+            args=["-y", "some-server", "--token", "ghp_EXAMPLEfaketoken0000000000000000000000"],
+        )
+        findings = check_secrets(server)
+        # The flag name "--token" is skipped (starts with -), but the value arg is checked
+        assert any(f.check_id == "SEC-002" for f in findings)
+
+    def test_openai_key_in_args_detected(self):
+        server = make_server(
+            command="node",
+            args=["server.js", "--api-key", "sk-proj-EXAMPLEfaketoken000000000000000000000000000000"],
+        )
+        findings = check_secrets(server)
+        assert any(f.check_id == "SEC-004" for f in findings)
+
+    def test_flag_names_not_flagged(self):
+        """--api-key itself (the flag name) should not trigger a finding."""
+        server = make_server(
+            command="node",
+            args=["server.js", "--api-key"],
+        )
+        findings = check_secrets(server)
+        # No secret value, so no finding
+        sec_findings = [f for f in findings if f.check_id.startswith("SEC-00")]
+        assert not any(f.check_id in ("SEC-001", "SEC-002", "SEC-003", "SEC-004", "SEC-005") for f in sec_findings)
+
+    def test_placeholder_arg_not_flagged(self):
+        server = make_server(
+            command="node",
+            args=["server.js", "${MY_API_KEY}"],
+        )
+        findings = check_secrets(server)
+        assert not any(f.check_id in ("SEC-001", "SEC-002", "SEC-004") for f in findings)
+
+    def test_cwe_214_on_arg_secret(self):
+        """CWE-214: secrets exposed in process invocation."""
+        server = make_server(
+            command="npx",
+            args=["some-server", "AKIAIOSFODNN7EXAMPLE"],
+        )
+        findings = check_secrets(server)
+        sec001 = [f for f in findings if f.check_id == "SEC-001"]
+        assert len(sec001) >= 1
+        assert sec001[0].cwe_id == "CWE-214"
