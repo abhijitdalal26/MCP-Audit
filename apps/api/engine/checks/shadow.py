@@ -259,6 +259,43 @@ def check_shadow(server: MCPServer) -> list[Finding]:
             ))
             break  # One SH-005 per server is sufficient
 
+    # SH-006: HTTP/SSE transport with no authentication configuration
+    # Research: Censys 2026 — 12,520 MCP services publicly exposed; ~40% with no auth.
+    # tooltrust AS-019 equivalent: unauthenticated MCP route exposure.
+    # We check: server has a url: field (SSE/HTTP transport) and no auth-related env var.
+    if server.url and server.url.startswith("http"):
+        _AUTH_LIKE_PATTERNS = re.compile(
+            r'(?i)(api[_\-]?key|api[_\-]?token|auth[_\-]?token|bearer|secret|password|passwd|'
+            r'credential|oauth|jwt|x[_\-]?api|access[_\-]?token|id[_\-]?token|client[_\-]?secret|'
+            r'authorization|apikey)',
+        )
+        has_auth_env = any(_AUTH_LIKE_PATTERNS.search(k) for k in server.env)
+        has_auth_in_url = bool(re.search(r'[?&](key|token|secret|auth|api_key)=', server.url, re.I))
+        if not has_auth_env and not has_auth_in_url:
+            findings.append(Finding(
+                check_id="SH-006",
+                title=f"HTTP MCP server appears to have no authentication: `{server.url}`",
+                detail=(
+                    f"Server `{server.name}` connects to `{server.url}` via HTTP/SSE transport "
+                    "but has no auth-related environment variables (API key, token, bearer, etc.) "
+                    "and no credential query parameters in the URL. "
+                    "If this endpoint is network-accessible, any process or user on the network "
+                    "can call its tools without proving identity. "
+                    "(Research: Censys 2026 — ~40% of 12,520 exposed MCP services have no authentication)"
+                ),
+                severity=Severity.MEDIUM,
+                owasp=OWASPCategory.MCP07,
+                server_name=server.name,
+                remediation=(
+                    "Add an authentication mechanism: set an API key via env var (e.g. `MCP_API_KEY`), "
+                    "use mTLS client certificates, or ensure the HTTP transport enforces token-based auth. "
+                    "Never expose an MCP HTTP endpoint on a shared network without authentication."
+                ),
+                engine="custom",
+                attack_tactic="initial-access",
+                cwe_id="CWE-306",
+            ))
+
     return findings
 
 

@@ -295,6 +295,66 @@ class TestShadow:
         findings = check_shadow(server)
         assert not any(f.check_id == "SH-002" for f in findings)
 
+    def test_sh006_http_sse_no_auth_env_flagged(self):
+        """SH-006: HTTP SSE endpoint with no auth env vars is unauthenticated exposure."""
+        server = make_server(
+            url="https://mcp.company.com/sse",
+            env={"DEBUG": "true", "LOG_LEVEL": "info"},
+        )
+        findings = check_shadow(server)
+        sh6 = [f for f in findings if f.check_id == "SH-006"]
+        assert len(sh6) == 1
+        assert sh6[0].cwe_id == "CWE-306"
+
+    def test_sh006_http_sse_with_api_key_not_flagged(self):
+        """SH-006: HTTP SSE endpoint with API_KEY env var is considered authenticated."""
+        server = make_server(
+            url="https://mcp.company.com/sse",
+            env={"MCP_API_KEY": "sk-production-key-abc123"},
+        )
+        findings = check_shadow(server)
+        assert not any(f.check_id == "SH-006" for f in findings)
+
+    def test_sh006_stdio_server_no_url_not_flagged(self):
+        """SH-006: stdio servers have no URL, so SH-006 must not fire."""
+        server = make_server(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem"],
+        )
+        findings = check_shadow(server)
+        assert not any(f.check_id == "SH-006" for f in findings)
+
+
+# ── Privilege ─────────────────────────────────────────────────────────────────
+
+class TestPrivilegePathTraversal:
+    def test_pe008_dotdot_slash_in_arg(self):
+        """PE-008: Path traversal (..) in server arg indicates directory escape attempt."""
+        server = make_server(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", "/home/user/../../../etc"],
+        )
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-008" for f in findings)
+
+    def test_pe008_backslash_dotdot_in_arg(self):
+        """PE-008: Windows-style path traversal (..\\) also fires."""
+        server = make_server(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\..\\Windows\\System32"],
+        )
+        findings = check_privilege(server)
+        assert any(f.check_id == "PE-008" for f in findings)
+
+    def test_pe008_clean_absolute_path_not_flagged(self):
+        """PE-008: Normal absolute path without traversal sequences must not fire."""
+        server = make_server(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"],
+        )
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-008" for f in findings)
+
 
 # ── Code Execution ────────────────────────────────────────────────────────────
 

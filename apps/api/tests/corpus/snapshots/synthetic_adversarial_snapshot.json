@@ -2,10 +2,10 @@
   "source_file": "synthetic_adversarial.json",
   "risk_score": 100,
   "risk_grade": "F",
-  "total_findings": 27,
+  "total_findings": 28,
   "by_severity": {
     "critical": 7,
-    "high": 10,
+    "high": 11,
     "medium": 10,
     "low": 0,
     "info": 0
@@ -146,6 +146,14 @@
       "server": "cloud-helper",
       "owasp": "MCP07",
       "attack_tactic": null
+    },
+    {
+      "check_id": "CHAIN-001",
+      "title": "Write+Execute gadget pair: `file-manager` (filesystem) + `data-exporter` (executor)",
+      "severity": "high",
+      "server": "file-manager + data-exporter",
+      "owasp": "MCP02",
+      "attack_tactic": "execution"
     },
     {
       "check_id": "SEC-006",

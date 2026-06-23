@@ -15,6 +15,7 @@ from .checks import (
     check_audit,
     check_lifecycle,
     check_config_level,
+    check_cross_server_chains,
 )
 
 _SEVERITY_ORDER: dict[Severity, int] = {
@@ -51,6 +52,8 @@ def scan(config: MCPConfig) -> ScanResult:
 
     # Config-level cross-server checks
     all_findings.extend(check_config_level(config, per_server))
+    # Cross-server capability chain analysis (Research 2)
+    all_findings.extend(check_cross_server_chains(config, per_server))
 
     n = len(config.servers)
 

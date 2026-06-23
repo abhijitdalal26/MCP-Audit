@@ -348,6 +348,40 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                 cwe_id="CWE-250",
             ))
 
+    # PE-008: Path traversal sequences in server args (CWE-22)
+    # Legitimate MCP server configs use absolute paths — never relative traversals.
+    # If a server arg contains "/.." or "\..", it may be an attempt to escape the intended dir.
+    # Source: Anthropic Git MCP path traversal CVE (Nov 2025); OWASP Path Traversal CWE-22.
+    _PATH_TRAVERSAL_RE = re.compile(r'(?:^|[/\\])\.\.[/\\]|(?:^|[/\\])\.\.(?:$)')
+    for arg in server.args:
+        if _PATH_TRAVERSAL_RE.search(arg):
+            findings.append(Finding(
+                check_id="PE-008",
+                title=f"Path traversal sequence in server arg: `{arg[:80]}`",
+                detail=(
+                    f"Server `{server.name}` has an argument containing `..` path traversal: "
+                    f"`{arg[:200]}`. "
+                    "Legitimate MCP configs always use absolute, canonical paths. "
+                    "The presence of `..` sequences suggests either a misconfiguration or "
+                    "an injection attempt to escape the intended directory sandbox — "
+                    "for example, `/home/user/projects/../../etc/passwd` resolves to `/etc/passwd`. "
+                    "(CVE reference: Anthropic Git MCP server path traversal + argument injection, Nov 2025)"
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP02,
+                server_name=server.name,
+                remediation=(
+                    f"Replace the argument `{arg[:80]}` with the resolved absolute path "
+                    "(run `realpath` on the intended directory). "
+                    "Never use `..` sequences in MCP filesystem server arguments. "
+                    "If this argument came from external input, ensure it is canonicalized before use."
+                ),
+                engine="custom",
+                attack_tactic="privilege-escalation",
+                cwe_id="CWE-22",
+            ))
+            break  # One PE-008 per server
+
     # PE-007: Permission bypass flag in server args
     # These flags cause the MCP client to auto-approve every tool call without user consent.
     # Combining PE-007 with any prompt injection or supply chain attack = immediate exploit.

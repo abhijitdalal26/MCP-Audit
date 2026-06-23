@@ -4,8 +4,8 @@
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
 ## Current State (2026-06-23)
-- **Engine**: 45 check IDs across 10 modules, 233/233 tests passing
-- **Research**: 2 research threads active in `research/` — see `research/RESEARCH_INDEX.md`
+- **Engine**: 48 check IDs across 11 modules, 283/283 tests passing
+- **Research**: 2 research threads complete in `research/` — see `research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js minimal UI with risk grade (A-F) display
 - **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
@@ -26,13 +26,14 @@ apps/api/                  FastAPI backend
       secrets.py           SEC-001–007 (includes HTTP basic auth + cloud metadata endpoint)
       supply_chain.py      SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override)
       tool_poisoning.py    PI-001–005, DX-001 (both scan args + env var values)
-      privilege.py         PE-001–006 (+ sudo/elevated command detection)
-      shadow.py            SH-001–005
+      privilege.py         PE-001–008 (incl. sudo/elevated cmds, permission bypass, path traversal)
+      shadow.py            SH-001–006 (incl. unauthenticated SSE endpoint)
       code_execution.py    EX-001–003 (+ PowerShell encoded cmd + curl|bash)
       osv_lookup.py        SC-004 (OSV.dev live CVE)
       audit.py             AT-002–004
       lifecycle.py         LF-001
       config_level.py      CL-001–003, EC-001 (+ security feature disable detection)
+      chain_analysis.py    CHAIN-001–003 (cross-server capability chain analysis)
   tests/
     test_secrets.py        14 secret pattern tests
     test_engine.py         30 engine unit/integration tests
@@ -69,7 +70,7 @@ cd apps/api
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
 
-# Tests (168/168)
+# Tests (283/283)
 .venv/Scripts/pytest tests/ -v
 
 # Frontend
@@ -77,7 +78,7 @@ cd apps/web
 npm install && npm run dev   # → http://localhost:3000
 ```
 
-## Security Check IDs (44 total)
+## Security Check IDs (48 total)
 All checks mapped to OWASP MCP Top 10:
 
 | Module | IDs | OWASP |
@@ -86,13 +87,14 @@ All checks mapped to OWASP MCP Top 10:
 | supply_chain.py | SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override) | MCP04 |
 | osv_lookup.py | SC-004 | MCP04 |
 | tool_poisoning.py | PI-001–005, DX-001 (incl. invisible Unicode, env var scan) | MCP03, MCP06 |
-| privilege.py | PE-001–007 (incl. sudo/elevated cmds, permission bypass) | MCP02, MCP05, MCP10 |
-| shadow.py | SH-001–005 | MCP03, MCP07, MCP09 |
+| privilege.py | PE-001–008 (incl. path traversal, permission bypass, sudo) | MCP02, MCP05, MCP10 |
+| shadow.py | SH-001–006 (incl. unauthenticated SSE endpoint detection) | MCP03, MCP07, MCP09 |
 | code_execution.py | EX-001–003 (incl. PowerShell encoded cmd, curl|bash) | MCP05 |
 | audit.py | AT-002–004 | MCP08 |
 | lifecycle.py | LF-001 | MCP04 |
 | config_level.py | CL-001–003, EC-001 (incl. TLS bypass, auth disable) | MCP02, MCP03, MCP01, MCP07 |
 | scanner.py | AT-001, AT-005 | MCP08 |
+| chain_analysis.py | CHAIN-001–003 | MCP02 |
 
 Full check specs: documentaion/progress/builds_log.md (not in git — Obsidian vault)
 

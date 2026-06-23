@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-233%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-283%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,7 +13,7 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**45 checks across 10 modules:**
+**48 checks across 11 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
@@ -21,8 +21,9 @@ Every MCP server you add to Claude Desktop or Cursor gets access to your filesys
 | `supply_chain.py` | SC-001–003, SC-005–007 | Malicious/typosquatted packages, GitHub ref deps, homoglyph names, registry override (Birsan attack) |
 | `osv_lookup.py` | SC-004 | Live CVE lookup via OSV.dev |
 | `tool_poisoning.py` | PI-001–005, DX-001 | Prompt injection, obfuscation, invisible Unicode, bidi overrides, data exfiltration |
-| `privilege.py` | PE-001–007 | Overbroad filesystem, shell access, Docker privilege, sudo, permission bypass flags |
-| `shadow.py` | SH-001–005 | Unregistered servers, HTTP, homoglyphs, auto-discovery |
+| `privilege.py` | PE-001–008 | Overbroad filesystem, shell, Docker, sudo, permission bypass, path traversal |
+| `shadow.py` | SH-001–006 | Unregistered servers, HTTP, homoglyphs, auto-discovery, unauthenticated SSE |
+| `chain_analysis.py` | CHAIN-001–003 | Cross-server capability chains: write+exec (RCE), secrets+HTTP (exfil), amplified blast radius |
 | `code_execution.py` | EX-001–003 | Inline code execution, command substitution, PowerShell encoded cmds, curl-pipe-bash |
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
 | `lifecycle.py` | LF-001 | Postinstall script abuse |
@@ -97,7 +98,7 @@ apps/api/           FastAPI backend
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
     checks/         41 check implementations
-  tests/            233 tests (unit + property-based + real-world corpus)
+  tests/            283 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -125,7 +126,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 233 tests
+.venv/Scripts/pytest tests/ -v    # 283 tests
 
 # Frontend
 cd apps/web
@@ -146,7 +147,7 @@ All 10 categories covered:
 | MCP04 | Supply Chain Attacks | SC-001–007, LF-001 |
 | MCP05 | Command Injection & Execution | EX-001–002, PE-005 |
 | MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
-| MCP07 | Insufficient Authentication | SH-002, CL-003 |
+| MCP07 | Insufficient Authentication | SH-002, SH-006, CL-003 |
 | MCP08 | Lack of Audit and Telemetry | AT-001–005 |
 | MCP09 | Shadow MCP Servers | SH-001, SH-003, SH-005 |
 | MCP10 | Context Injection & Over-Sharing | PE-004 |
