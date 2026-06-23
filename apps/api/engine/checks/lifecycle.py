@@ -56,6 +56,7 @@ def check_lifecycle(server: MCPServer) -> list[Finding]:
             ),
             engine="custom",
             attack_tactic="execution",
+            cwe_id="CWE-912",
         ))
 
     return findings

@@ -118,6 +118,7 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                         "(e.g., `/Users/you/projects/myapp` instead of `/Users`)."
                     ),
                     engine="custom",
+                    cwe_id="CWE-732",
                 ))
 
     # PE-002: Shell execution capabilities in args
@@ -141,6 +142,7 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                         "Consider using a more restricted alternative if shell access is not required."
                     ),
                     engine="custom",
+                    cwe_id="CWE-77",
                 ))
                 break
 
@@ -170,6 +172,7 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                         "this specific server actually requires."
                     ),
                     engine="custom",
+                    cwe_id="CWE-250",
                 ))
                 break
 
@@ -195,6 +198,7 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                             "For PostgreSQL, create a role with only SELECT privileges."
                         ),
                         engine="custom",
+                        cwe_id="CWE-732",
                     ))
 
     # PE-005: Docker privilege escalation

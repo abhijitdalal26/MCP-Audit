@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-190%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-224%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,14 +13,14 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**41 checks across 10 modules:**
+**43 checks across 10 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
-| `secrets.py` | SEC-001–007 | Hardcoded credentials, API keys, tokens, HTTP basic auth, cloud metadata endpoints |
-| `supply_chain.py` | SC-001–003, SC-005 | Malicious/typosquatted packages, GitHub ref deps |
+| `secrets.py` | SEC-001–007 | Hardcoded credentials, API keys, tokens, HTTP basic auth, cloud metadata endpoints (SSRF/IMDS) |
+| `supply_chain.py` | SC-001–003, SC-005–006 | Malicious/typosquatted packages, GitHub ref deps, homoglyph package names, `uv run --with` |
 | `osv_lookup.py` | SC-004 | Live CVE lookup via OSV.dev |
-| `tool_poisoning.py` | PI-001–004, DX-001 | Prompt injection, obfuscation, data exfiltration |
+| `tool_poisoning.py` | PI-001–005, DX-001 | Prompt injection, obfuscation, invisible Unicode, bidi overrides, data exfiltration |
 | `privilege.py` | PE-001–006 | Overbroad filesystem, shell access, Docker privilege, sudo/elevated commands |
 | `shadow.py` | SH-001–005 | Unregistered servers, HTTP, homoglyphs, auto-discovery |
 | `code_execution.py` | EX-001–003 | Inline code execution, command substitution, PowerShell encoded cmds, curl-pipe-bash |
@@ -97,7 +97,7 @@ apps/api/           FastAPI backend
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
     checks/         41 check implementations
-  tests/            190 tests (unit + property-based + real-world corpus)
+  tests/            224 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -125,7 +125,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 189 tests
+.venv/Scripts/pytest tests/ -v    # 224 tests
 
 # Frontend
 cd apps/web

@@ -199,8 +199,8 @@ class TestSecretsInArgs:
         findings = check_secrets(server)
         assert not any(f.check_id in ("SEC-001", "SEC-002", "SEC-004") for f in findings)
 
-    def test_cwe_214_on_arg_secret(self):
-        """CWE-214: secrets exposed in process invocation."""
+    def test_cwe_798_on_arg_secret(self):
+        """CWE-798: hardcoded credentials — applies to args just as to env vars."""
         server = make_server(
             command="npx",
             args=["some-server", "AKIAIOSFODNN7EXAMPLE"],
@@ -208,4 +208,4 @@ class TestSecretsInArgs:
         findings = check_secrets(server)
         sec001 = [f for f in findings if f.check_id == "SEC-001"]
         assert len(sec001) >= 1
-        assert sec001[0].cwe_id == "CWE-214"
+        assert sec001[0].cwe_id == "CWE-798"

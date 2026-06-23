@@ -36,6 +36,7 @@ def check_audit(server: MCPServer) -> list[Finding]:
                 "Remote servers: keep `url`, remove `command` (or use it only for the local proxy)."
             ),
             engine="custom",
+            cwe_id="CWE-16",
         ))
 
     # AT-003: No transport declared with a URL (implicit HTTP, no SSE/Streamable config)
@@ -58,6 +59,7 @@ def check_audit(server: MCPServer) -> list[Finding]:
                     "server config to make the transport explicit."
                 ),
                 engine="custom",
+                cwe_id="CWE-16",
             ))
 
     # AT-004: Network binding to all interfaces (NeighborJack / localhost bypass)

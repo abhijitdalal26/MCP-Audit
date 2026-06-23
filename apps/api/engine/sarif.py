@@ -123,6 +123,9 @@ def _check_id_to_name(check_id: str) -> str:
         "SH": "ShadowServer",
         "AT": "AuditTelemetry",
         "EX": "CodeExecution",
+        "LF": "LifecycleScript",
+        "CL": "ConfigLevel",
+        "EC": "EnvironmentConfig",
     }
     prefix = check_id.split("-")[0]
     suffix = check_id.split("-")[1] if "-" in check_id else ""

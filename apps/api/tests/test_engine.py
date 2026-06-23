@@ -41,6 +41,45 @@ class TestSupplyChain:
         findings = check_supply_chain(server)
         assert len(findings) == 0
 
+    def test_uv_run_with_malicious_package(self):
+        """SC-001 fires for malicious package in `uv run --with` (Python MCP servers)."""
+        server = make_server(command="uv", args=["run", "--with", "mcp-server-free", "server.py"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-001" for f in findings)
+
+    def test_uv_run_with_multiple_packages(self):
+        """uv run --with pkg1 --with pkg2 — both packages are checked."""
+        server = make_server(
+            command="uv",
+            args=["run", "--with", "mcp-server-free", "--with", "@randomscope/mcp-pkg", "server.py"],
+        )
+        findings = check_supply_chain(server)
+        # SC-001 from mcp-server-free AND SC-003 from unverified scope
+        check_ids = {f.check_id for f in findings}
+        assert "SC-001" in check_ids
+
+    def test_uv_run_with_no_packages_no_findings(self):
+        """uv run without --with has no packages to check."""
+        server = make_server(command="uv", args=["run", "server.py"])
+        findings = check_supply_chain(server)
+        assert len(findings) == 0
+
+    def test_uv_run_with_pinned_python_pkg_no_sec006(self):
+        """Python packages pinned with == should not trigger SEC-006 via AT-001."""
+        import json
+        from engine.parser import parse_config
+        from engine.scanner import scan
+        config_json = json.dumps({
+            "mcpServers": {
+                "a": {"command": "uv", "args": ["run", "--with", "mcp==1.2.3", "server.py"]},
+                "b": {"command": "uv", "args": ["run", "--with", "httpx==0.27.0", "server.py"]},
+            }
+        })
+        config = parse_config(config_json)
+        result = scan(config)
+        # Both servers have Python == pins — AT-001 should not fire
+        assert not any(f.check_id == "AT-001" for f in result.findings)
+
 
 # ── Tool Poisoning ────────────────────────────────────────────────────────────
 

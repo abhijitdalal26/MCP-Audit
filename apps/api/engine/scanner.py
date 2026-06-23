@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from .models import Finding, Severity, ScanResult, ScanSummary, OWASPCategory, SEVERITY_SCORE_WEIGHTS
 from .parser import MCPConfig
 from .checks.secrets import _is_pinned, _is_package_arg
+from .checks.supply_chain import _extract_packages
 from .checks import (
     check_secrets,
     check_supply_chain,
@@ -74,6 +75,7 @@ def scan(config: MCPConfig) -> ScanResult:
                     "This ensures reproducibility and protects against silent rug pulls."
                 ),
                 engine="custom",
+                cwe_id="CWE-1104",
             ))
 
     # AT-005: Excessive server count — each server is an independent entry point
@@ -112,9 +114,15 @@ def scan(config: MCPConfig) -> ScanResult:
 
 
 def _any_pinned(server) -> bool:
-    """True if the server has at least one package arg pinned to an exact semver."""
+    """True if the server has at least one package arg pinned to an exact semver.
+    Also checks uv run --with packages for Python == pinning.
+    """
     for arg in server.args:
         if _is_package_arg(arg) and _is_pinned(arg):
+            return True
+    # Python packages: mcp-server==1.2.3 is pinned; mcp-server>=1.2.3 is not
+    for pkg, runtime in _extract_packages(server):
+        if runtime == "pypi" and "==" in pkg:
             return True
     return False
 

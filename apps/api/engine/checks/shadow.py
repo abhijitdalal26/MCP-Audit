@@ -144,6 +144,7 @@ def check_shadow(server: MCPServer) -> list[Finding]:
                         ),
                         engine="custom",
                         attack_tactic="initial-access",
+                        cwe_id="CWE-829",
                     ))
                 break  # Only one SH-001 per server
 
@@ -191,6 +192,7 @@ def check_shadow(server: MCPServer) -> list[Finding]:
                     "or install it locally and reference the binary directly so it is not re-fetched each run."
                 ),
                 engine="custom",
+                cwe_id="CWE-346",
             ))
 
     # SH-004: Unicode homoglyphs in server name (Adversa AI Top 25 #12 — Tool Name Spoofing)

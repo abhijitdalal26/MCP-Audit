@@ -119,6 +119,7 @@ def _check_confused_deputy(config: MCPConfig, per_server_findings: dict[str, lis
                 ),
                 engine="custom",
                 attack_tactic="privilege-escalation",
+                cwe_id="CWE-441",
             ))
 
         # Secrets + shell = can exfiltrate credentials out of band
@@ -141,6 +142,7 @@ def _check_confused_deputy(config: MCPConfig, per_server_findings: dict[str, lis
                 ),
                 engine="custom",
                 attack_tactic="credential-access",
+                cwe_id="CWE-441",
             ))
 
 
@@ -173,6 +175,7 @@ def _check_duplicate_servers(config: MCPConfig, out: list[Finding]) -> None:
                     "second entry is not a misconfigured or injected copy."
                 ),
                 engine="custom",
+                cwe_id="CWE-290",
             ))
         else:
             seen[key] = server.name
@@ -253,4 +256,5 @@ def _check_debug_logging_exposure(config: MCPConfig, per_server_findings: dict[s
                     "placeholder credentials and never commit debug-mode configs."
                 ),
                 engine="custom",
+                cwe_id="CWE-532",
             ))

@@ -2,6 +2,17 @@ import re
 from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
 
+# CWE ID per check — applied to all Finding() calls
+_CHECK_CWE: dict[str, str] = {
+    "SEC-001": "CWE-798",   # Use of Hard-Coded Credentials
+    "SEC-002": "CWE-798",   # Use of Hard-Coded Credentials
+    "SEC-003": "CWE-798",   # Use of Hard-Coded Credentials (DB connection strings)
+    "SEC-004": "CWE-798",   # Use of Hard-Coded Credentials (API keys)
+    "SEC-005": "CWE-312",   # Cleartext Storage of Sensitive Information (JWT/SSH keys)
+    "SEC-006": "CWE-1104",  # Use of Unmaintained Third Party Components (unpinned)
+    "SEC-007": "CWE-918",   # Server-Side Request Forgery (cloud metadata endpoint)
+}
+
 # (check_id, human title, compiled regex, severity)
 _VALUE_PATTERNS: list[tuple[str, str, re.Pattern, Severity]] = [
     # SEC-001: AWS
@@ -133,6 +144,7 @@ def check_secrets(server: MCPServer) -> list[Finding]:
                         "so the plaintext never appears in the config file."
                     ),
                     engine="custom",
+                    cwe_id=_CHECK_CWE.get(check_id),
                 ))
                 break
 
@@ -158,6 +170,7 @@ def check_secrets(server: MCPServer) -> list[Finding]:
                             "Use environment variable substitution or a secrets management tool."
                         ),
                         engine="custom",
+                        cwe_id=_CHECK_CWE.get(check_id),
                     ))
                     break
 
@@ -190,7 +203,7 @@ def check_secrets(server: MCPServer) -> list[Finding]:
                         "so the plaintext never appears in the config or process table."
                     ),
                     engine="custom",
-                    cwe_id="CWE-214",
+                    cwe_id=_CHECK_CWE.get(check_id, "CWE-214"),
                 ))
                 break
 
@@ -213,6 +226,7 @@ def check_secrets(server: MCPServer) -> list[Finding]:
                     "Check the latest stable version on npmjs.com and commit that exact version string."
                 ),
                 engine="custom",
+                cwe_id="CWE-1104",
             ))
 
     return findings

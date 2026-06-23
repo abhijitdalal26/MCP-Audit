@@ -50,6 +50,67 @@ _UNICODE_ESC_RE = re.compile(r'(?:\\u[0-9a-fA-F]{4}){4,}')
 # 4+ consecutive hex escapes = same technique in hex form
 _HEX_ESC_RE = re.compile(r'(?:\\x[0-9a-fA-F]{2}){4,}')
 
+# PI-005: Invisible / zero-width / bidi-override Unicode characters (Research 1).
+# Distinct from PI-004: PI-004 catches \uXXXX as a literal 6-char text sequence.
+# PI-005 catches the actual decoded codepoints already present in the config string.
+# SH-004 catches non-ASCII *letters* (Unicode category "L") in server names.
+# PI-005 targets category "Cf" (Format) chars in args/env — a vector SH-004 misses.
+# Reference: Trojan Source CVE-2021-42574; MDPI May 2026 MCP Threat Modeling paper.
+_INVISIBLE_UNICODE: dict[str, str] = {
+    '​': 'Zero Width Space',
+    '‌': 'Zero Width Non-Joiner',
+    '‍': 'Zero Width Joiner',
+    '﻿': 'BOM/Zero Width No-Break Space',
+    '⁠': 'Word Joiner',
+    '⁡': 'Function Application (invisible)',
+    '⁢': 'Invisible Times',
+    '⁣': 'Invisible Separator',
+    '⁤': 'Invisible Plus',
+    '­': 'Soft Hyphen',
+    '᠎': 'Mongolian Vowel Separator',
+    '͏': 'Combining Grapheme Joiner',
+}
+# Bidi overrides can flip text display direction — U+202E makes text read backwards in the UI.
+_BIDI_OVERRIDE_UNICODE: dict[str, str] = {
+    '‪': 'LTR Embedding',
+    '‫': 'RTL Embedding',
+    '‬': 'Pop Directional Formatting',
+    '‭': 'LTR Override',
+    '‮': 'RTL Override (Trojan Source)',
+    '⁦': 'LTR Isolate',
+    '⁧': 'RTL Isolate',
+    '⁨': 'First Strong Isolate',
+    '⁩': 'Pop Directional Isolate',
+}
+_ALL_STEALTH_UNICODE: dict[str, str] = {**_INVISIBLE_UNICODE, **_BIDI_OVERRIDE_UNICODE}
+
+
+def _find_stealth_chars(text: str) -> tuple[list[str], bool]:
+    """Return (unique_char_names_found, any_bidi_override_present)."""
+    found: list[str] = []
+    seen: set[str] = set()
+    any_bidi = False
+    for char in text:
+        if char in _ALL_STEALTH_UNICODE and char not in seen:
+            seen.add(char)
+            found.append(_ALL_STEALTH_UNICODE[char])
+            if char in _BIDI_OVERRIDE_UNICODE:
+                any_bidi = True
+    return found, any_bidi
+
+
+def _render_safe(text: str, max_len: int = 80) -> str:
+    """Safe ASCII representation of text for embedding in Finding.detail."""
+    parts: list[str] = []
+    for char in text[:max_len]:
+        if char in _ALL_STEALTH_UNICODE or ord(char) > 127 or ord(char) < 32:
+            parts.append(f'\\u{ord(char):04X}')
+        else:
+            parts.append(char)
+    if len(text) > max_len:
+        parts.append('...')
+    return ''.join(parts)
+
 
 def check_tool_poisoning(server: MCPServer) -> list[Finding]:
     findings: list[Finding] = []
@@ -80,6 +141,7 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
                         "Legitimate MCP servers do not embed instruction-override language in their configuration."
                     ),
                     engine="custom",
+                    cwe_id="CWE-77",
                 ))
                 break  # One PI-001 per source (args or env)
         else:
@@ -105,6 +167,7 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
                 "Look for any base64-encoded strings or unusually dense text blocks."
             ),
             engine="custom",
+            cwe_id="CWE-400",
         ))
 
     # PI-003: Horizontal scroll hidden injection (MDPI May 2026)
@@ -132,6 +195,7 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
                     "If you need to pass long configuration, use a config file instead of an inline argument."
                 ),
                 engine="custom",
+                cwe_id="CWE-693",
             ))
             break  # One PI-003 per server
 
@@ -197,10 +261,61 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
                         "Legitimate MCP servers document all network calls and data flows explicitly."
                     ),
                     engine="custom",
+                    cwe_id="CWE-200",
                 ))
                 break
         else:
             continue
         break  # One DX-001 total — don't double-fire
+
+    # PI-005: Invisible / zero-width / bidi-override Unicode steganography
+    # Attack: embed U+200B (Zero Width Space) between letters of "ignore all instructions" —
+    # the text is invisible in Claude Desktop / Cursor approval dialogs but the LLM reads it
+    # intact, bypassing PI-001's keyword regex (which requires consecutive visible characters).
+    # Bidi overrides (U+202E) additionally flip display direction (Trojan Source technique).
+    _pi005_targets = [
+        (" ".join(server.args), "args"),
+        (" ".join(f"{k}={v}" for k, v in server.env.items()), "env vars"),
+        (server.name, "server name"),
+    ]
+    for target_text, source_label in _pi005_targets:
+        found_names, any_bidi = _find_stealth_chars(target_text)
+        if found_names:
+            severity = Severity.HIGH if any_bidi else Severity.MEDIUM
+            bidi_note = (
+                " Bidi override characters (Trojan Source technique, CVE-2021-42574) can "
+                "make injected text display as harmless-looking content while the LLM "
+                "processes the actual malicious instruction."
+            ) if any_bidi else ""
+            char_summary = ", ".join(found_names[:3])
+            if len(found_names) > 3:
+                char_summary += f" (+{len(found_names) - 3} more)"
+            findings.append(Finding(
+                check_id="PI-005",
+                title=f"Invisible Unicode in server {source_label}: {char_summary}",
+                detail=(
+                    f"Server `{server.name}` {source_label} contain invisible Unicode character(s): "
+                    f"{char_summary}. "
+                    "These characters render as nothing in Claude Desktop / Cursor approval dialogs "
+                    "but are passed to the language model in full, enabling completely invisible "
+                    "injection attacks. An attacker can split keywords like 'ignore' into "
+                    "'i​g​n​o​r​e' — bypassing PI-001 regex checks while "
+                    f"the LLM reads the word normally.{bidi_note}"
+                ),
+                severity=severity,
+                owasp=OWASPCategory.MCP03,
+                server_name=server.name,
+                remediation=(
+                    f"Open this server's {source_label} in a hex editor or Unicode-aware "
+                    "text editor to locate and remove the invisible characters. "
+                    "These have no legitimate use in MCP server configuration. "
+                    "If this config was received from an external source or copy-pasted "
+                    "from a chat/web page, treat it as potentially tampered."
+                ),
+                engine="custom",
+                attack_tactic="defense-evasion",
+                cwe_id="CWE-116",
+            ))
+            break  # One PI-005 per server — first field wins to avoid noise
 
     return findings
