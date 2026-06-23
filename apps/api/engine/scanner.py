@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from .models import Finding, Severity, ScanResult, ScanSummary, OWASPCategory
+from .models import Finding, Severity, ScanResult, ScanSummary, OWASPCategory, SEVERITY_SCORE_WEIGHTS
 from .parser import MCPConfig
 from .checks import (
     check_secrets,
@@ -11,6 +11,7 @@ from .checks import (
     check_code_execution,
     check_osv,
     check_audit,
+    check_lifecycle,
 )
 
 _SEVERITY_ORDER: dict[Severity, int] = {
@@ -34,6 +35,7 @@ def scan(config: MCPConfig) -> ScanResult:
         all_findings.extend(check_shadow(server))
         all_findings.extend(check_code_execution(server))
         all_findings.extend(check_audit(server))
+        all_findings.extend(check_lifecycle(server))
         # Network check (OSV.dev) — may add latency, fails gracefully if unavailable
         all_findings.extend(check_osv(server))
 
@@ -80,12 +82,30 @@ def _any_pinned(server) -> bool:
     return False
 
 
+def _risk_score(findings: list[Finding]) -> tuple[int, str]:
+    """Return (0-100 risk score, A-F grade)."""
+    raw = sum(SEVERITY_SCORE_WEIGHTS.get(f.severity.value, 0) for f in findings)
+    score = min(100, raw)
+    if score < 20:
+        grade = "A"
+    elif score < 40:
+        grade = "B"
+    elif score < 60:
+        grade = "C"
+    elif score < 80:
+        grade = "D"
+    else:
+        grade = "F"
+    return score, grade
+
+
 def _summarize(findings: list[Finding], server_count: int) -> ScanSummary:
     counts: dict[Severity, int] = {s: 0 for s in Severity}
     owasp_hit: set[str] = set()
     for f in findings:
         counts[f.severity] += 1
         owasp_hit.add(f.owasp.value)
+    score, grade = _risk_score(findings)
     return ScanSummary(
         total=len(findings),
         critical=counts[Severity.CRITICAL],
@@ -95,4 +115,6 @@ def _summarize(findings: list[Finding], server_count: int) -> ScanSummary:
         info=counts[Severity.INFO],
         servers_scanned=server_count,
         owasp_coverage=sorted(owasp_hit),
+        risk_score=score,
+        risk_grade=grade,
     )

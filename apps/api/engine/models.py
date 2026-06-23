@@ -50,6 +50,15 @@ ATTACK_TACTICS = {
     "impact": "Impact",
 }
 
+# Weight contribution to 0-100 risk score
+SEVERITY_SCORE_WEIGHTS: dict[str, int] = {
+    "critical": 25,
+    "high": 10,
+    "medium": 4,
+    "low": 1,
+    "info": 0,
+}
+
 
 class Finding(BaseModel):
     check_id: str
@@ -73,6 +82,10 @@ class ScanSummary(BaseModel):
     info: int
     servers_scanned: int
     owasp_coverage: list[str]
+    # 0-100 risk score: 0 = clean, 100 = extremely high risk
+    risk_score: int = 0
+    # Letter grade: A (0-19), B (20-39), C (40-59), D (60-79), F (80-100)
+    risk_grade: str = "A"
 
 
 class ScanResult(BaseModel):

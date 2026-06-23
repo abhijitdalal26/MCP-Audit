@@ -6,6 +6,7 @@ from .shadow import check_shadow
 from .code_execution import check_code_execution
 from .osv_lookup import check_osv
 from .audit import check_audit
+from .lifecycle import check_lifecycle
 
 __all__ = [
     "check_secrets",
@@ -16,4 +17,5 @@ __all__ = [
     "check_code_execution",
     "check_osv",
     "check_audit",
+    "check_lifecycle",
 ]

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -8,6 +8,7 @@ from engine.parser import parse_config
 from engine.scanner import scan
 from engine.models import ScanResult
 from engine.sarif import to_sarif
+from engine.cyclonedx import to_cyclonedx
 
 app = FastAPI(
     title="MCPAudit API",
@@ -63,10 +64,7 @@ def run_scan_sarif(req: ScanRequest) -> JSONResponse:
         raise HTTPException(status_code=422, detail=str(e))
 
     if not config.servers:
-        raise HTTPException(
-            status_code=422,
-            detail="No MCP servers found.",
-        )
+        raise HTTPException(status_code=422, detail="No MCP servers found.")
 
     result = scan(config)
     sarif_doc = to_sarif(result, config_path=req.config_path or "mcp.json")
@@ -75,4 +73,25 @@ def run_scan_sarif(req: ScanRequest) -> JSONResponse:
         content=sarif_doc,
         media_type="application/sarif+json",
         headers={"Content-Disposition": "attachment; filename=mcpaudit-results.sarif"},
+    )
+
+
+@app.post("/scan/bom")
+def run_scan_bom(req: ScanRequest) -> JSONResponse:
+    """Return AI-BOM in CycloneDX 1.6 format for supply chain compliance reporting."""
+    try:
+        config = parse_config(req.config)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if not config.servers:
+        raise HTTPException(status_code=422, detail="No MCP servers found.")
+
+    result = scan(config)
+    bom = to_cyclonedx(result, config)
+
+    return JSONResponse(
+        content=bom,
+        media_type="application/vnd.cyclonedx+json; version=1.6",
+        headers={"Content-Disposition": "attachment; filename=mcpaudit-bom.cdx.json"},
     )
