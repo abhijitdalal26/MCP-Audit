@@ -111,7 +111,7 @@ class TestDebugLoggingExposure:
                     "command": "npx",
                     "args": ["-y", "@modelcontextprotocol/server-github"],
                     "env": {
-                        "GITHUB_TOKEN": "ghp_abc123def456ghi789jkl012mno345pqrstu",
+                        "GITHUB_TOKEN": "ghp_EXAMPLEfaketoken0000000000000000000000",
                         "DEBUG": "true",
                     },
                 }

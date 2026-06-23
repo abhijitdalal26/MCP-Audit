@@ -177,7 +177,7 @@ class TestScannerIntegration:
                     "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users"],
                     "env": {
                         "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
-                        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_abc123def456ghi789jkl012mno345pqrstu",
+                        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_EXAMPLEfaketoken0000000000000000000000",
                     }
                 }
             }

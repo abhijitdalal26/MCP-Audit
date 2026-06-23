@@ -13,7 +13,7 @@ class TestValuePatterns:
         assert "SEC-001" in ids
 
     def test_github_pat_detected(self):
-        server = make_server(env={"TOKEN": "ghp_abc123def456ghi789jkl012mno345pqrstu"})
+        server = make_server(env={"TOKEN": "ghp_EXAMPLEfaketoken0000000000000000000000"})
         findings = check_secrets(server)
         ids = [f.check_id for f in findings]
         assert "SEC-002" in ids
@@ -27,13 +27,13 @@ class TestValuePatterns:
         assert "SEC-003" in ids
 
     def test_openai_key_detected(self):
-        server = make_server(env={"KEY": "sk-proj-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP1234"})
+        server = make_server(env={"KEY": "sk-proj-EXAMPLEfaketoken000000000000000000000000000000"})
         findings = check_secrets(server)
         ids = [f.check_id for f in findings]
         assert "SEC-004" in ids
 
     def test_slack_bot_token_detected(self):
-        server = make_server(env={"SLACK": "xoxb-123456789012-1234567890123-abcdefghijklmnopqrstuvwx"})
+        server = make_server(env={"SLACK": "xoxb-EXAMPLEONLY-EXAMPLEONLY-EXAMPLEONLYabcdefghi"})
         findings = check_secrets(server)
         ids = [f.check_id for f in findings]
         assert "SEC-004" in ids
