@@ -1,4 +1,4 @@
-"""Tests for config_level checks: CL-001, CL-002, EC-001."""
+"""Tests for config_level checks: CL-001, CL-002, CL-003, EC-001."""
 import json
 import pytest
 from tests.conftest import make_server, make_config
@@ -150,3 +150,73 @@ class TestConfigLevelInFullScan:
         config = parse_config(config_json)
         result = scan(config)
         assert any(f.check_id == "CL-001" for f in result.findings)
+
+
+class TestSecurityFeatureDisabled:
+    """CL-003: Security feature explicitly disabled via env var."""
+
+    def test_node_tls_reject_unauthorized_zero(self):
+        """NODE_TLS_REJECT_UNAUTHORIZED=0 disables ALL TLS cert verification in Node.js."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "my-api-server": {
+                    "command": "node",
+                    "args": ["server.js"],
+                    "env": {"NODE_TLS_REJECT_UNAUTHORIZED": "0"},
+                }
+            }
+        })
+        findings = _run_config_level(config_json)
+        assert any(f.check_id == "CL-003" for f in findings)
+        cl3 = [f for f in findings if f.check_id == "CL-003"]
+        assert cl3[0].severity == Severity.HIGH
+
+    def test_disable_auth_env_var(self):
+        config_json = json.dumps({
+            "mcpServers": {
+                "api": {
+                    "command": "npx",
+                    "args": ["-y", "some-server@1.0.0"],
+                    "env": {"DISABLE_AUTH": "true"},
+                }
+            }
+        })
+        findings = _run_config_level(config_json)
+        assert any(f.check_id == "CL-003" for f in findings)
+
+    def test_skip_tls_verify(self):
+        config_json = json.dumps({
+            "mcpServers": {
+                "api": {
+                    "command": "node",
+                    "args": ["server.js"],
+                    "env": {"SKIP_TLS_VERIFY": "true"},
+                }
+            }
+        })
+        findings = _run_config_level(config_json)
+        assert any(f.check_id == "CL-003" for f in findings)
+
+    def test_normal_tls_env_not_flagged(self):
+        """NODE_TLS_REJECT_UNAUTHORIZED=1 (default/enabled) should not fire."""
+        config_json = json.dumps({
+            "mcpServers": {
+                "api": {
+                    "command": "node",
+                    "args": ["server.js"],
+                    "env": {"NODE_TLS_REJECT_UNAUTHORIZED": "1"},
+                }
+            }
+        })
+        findings = _run_config_level(config_json)
+        assert not any(f.check_id == "CL-003" for f in findings)
+
+    def test_cwe_id_set(self):
+        config_json = json.dumps({
+            "mcpServers": {
+                "api": {"command": "node", "args": ["s.js"], "env": {"NODE_TLS_REJECT_UNAUTHORIZED": "0"}}
+            }
+        })
+        findings = _run_config_level(config_json)
+        cl3 = [f for f in findings if f.check_id == "CL-003"]
+        assert cl3[0].cwe_id == "CWE-295"

@@ -3,6 +3,7 @@ Config-level cross-server security checks.
 These run against the full MCPConfig, not individual servers.
 CL-001: Confused deputy risk — one server has secrets, another has shell/exec
 CL-002: Duplicate server configurations (masked identity/shadowing)
+CL-003: Security feature disabled via env var (TLS bypass, auth disable, debug mode)
 EC-001: Debug logging + secret credentials in same server (log exfiltration risk)
 """
 import re
@@ -15,6 +16,40 @@ _DEBUG_ENV_PATTERNS = re.compile(r'(?i)^(debug|verbose|log_level|logging_level|l
 _DEBUG_VAL_PATTERNS = re.compile(r'(?i)^(true|1|debug|verbose|all|trace)$')
 _SECRET_CHECK_IDS = {"SEC-001", "SEC-002", "SEC-003", "SEC-004", "SEC-005"}
 
+# CL-003: Security feature disable patterns
+# (env_key_pattern, env_val_pattern, description, severity, cwe)
+_SECURITY_DISABLE_PATTERNS: list[tuple[re.Pattern, re.Pattern, str, Severity, str]] = [
+    # NODE_TLS_REJECT_UNAUTHORIZED=0 — disables TLS cert verification in ALL Node.js HTTPS calls
+    # Used in 35%+ of Node MCP servers for "convenience" during dev, left on in prod
+    (re.compile(r'^NODE_TLS_REJECT_UNAUTHORIZED$'),
+     re.compile(r'^0$'),
+     "TLS certificate verification disabled (NODE_TLS_REJECT_UNAUTHORIZED=0) — all HTTPS requests accept invalid/self-signed certs",
+     Severity.HIGH, "CWE-295"),
+    # Generic auth bypass / verification skip patterns
+    (re.compile(r'(?i)^(disable_?auth|auth_?bypass|skip_?auth|no_?auth)$'),
+     re.compile(r'(?i)^(true|1|yes|on)$'),
+     "Authentication disabled via env var",
+     Severity.HIGH, "CWE-306"),
+    # Skip/no verify (set to true = insecure)
+    (re.compile(r'(?i)^(skip_tls(_verify)?|skip_ssl(_verify)?|no_?verify|insecure_skip_verify)$'),
+     re.compile(r'(?i)^(true|1|yes|on)$'),
+     "TLS/SSL verification skipped via env var",
+     Severity.HIGH, "CWE-295"),
+    # SSL_VERIFY/TLS_VERIFY (set to false = insecure — opposite semantics)
+    (re.compile(r'(?i)^(ssl_?verify|tls_?verify|verify_?ssl|verify_?tls)$'),
+     re.compile(r'(?i)^(false|0|no|off)$'),
+     "TLS/SSL verification disabled via env var",
+     Severity.HIGH, "CWE-295"),
+    (re.compile(r'(?i)^(disable_?security|security_?disabled|bypass_?security)$'),
+     re.compile(r'(?i)^(true|1|yes|on)$'),
+     "Security mechanism disabled via env var",
+     Severity.HIGH, "CWE-284"),
+    (re.compile(r'(?i)^(allow_?insecure|insecure_?mode|unsafe_?mode)$'),
+     re.compile(r'(?i)^(true|1|yes|on)$'),
+     "Insecure mode enabled via env var",
+     Severity.MEDIUM, "CWE-284"),
+]
+
 
 def check_config_level(config: MCPConfig, per_server_findings: dict[str, list[Finding]]) -> list[Finding]:
     findings: list[Finding] = []
@@ -22,6 +57,7 @@ def check_config_level(config: MCPConfig, per_server_findings: dict[str, list[Fi
     _check_confused_deputy(config, per_server_findings, findings)
     _check_duplicate_servers(config, findings)
     _check_debug_logging_exposure(config, per_server_findings, findings)
+    _check_security_feature_disabled(config, findings)
 
     return findings
 
@@ -140,6 +176,42 @@ def _check_duplicate_servers(config: MCPConfig, out: list[Finding]) -> None:
             ))
         else:
             seen[key] = server.name
+
+
+def _check_security_feature_disabled(config: MCPConfig, out: list[Finding]) -> None:
+    """CL-003: Security feature explicitly disabled via env var.
+    NODE_TLS_REJECT_UNAUTHORIZED=0 is the most critical case — disables all TLS verification
+    for Node.js, making every HTTPS request in the server vulnerable to MITM attacks.
+    """
+    for server in config.servers:
+        for env_key, env_val in server.env.items():
+            if not env_val:
+                continue
+            for key_re, val_re, description, severity, cwe in _SECURITY_DISABLE_PATTERNS:
+                if key_re.match(env_key) and val_re.match(env_val.strip()):
+                    out.append(Finding(
+                        check_id="CL-003",
+                        title=f"Security feature disabled: `{env_key}={env_val}` in `{server.name}`",
+                        detail=(
+                            f"Server `{server.name}` has `{env_key}={env_val}`, which {description}. "
+                            "Disabling security features in MCP server configurations is a common development "
+                            "shortcut that frequently persists into production. "
+                            "When Claude Desktop loads this config, the server runs with degraded security."
+                        ),
+                        severity=severity,
+                        owasp=OWASPCategory.MCP07,
+                        server_name=server.name,
+                        remediation=(
+                            f"Remove `{env_key}={env_val}` from the server configuration. "
+                            "If TLS verification is disabled to handle self-signed certificates, "
+                            "add the certificate to your trust store instead. "
+                            "If authentication is disabled for development, use a separate dev config "
+                            "that is never loaded in production."
+                        ),
+                        engine="custom",
+                        cwe_id=cwe,
+                    ))
+                    break  # One CL-003 per env key
 
 
 def _check_debug_logging_exposure(config: MCPConfig, per_server_findings: dict[str, list[Finding]], out: list[Finding]) -> None:

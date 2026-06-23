@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-180%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-185%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,7 +13,7 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**39 checks across 10 modules:**
+**40 checks across 10 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
@@ -26,7 +26,7 @@ Every MCP server you add to Claude Desktop or Cursor gets access to your filesys
 | `code_execution.py` | EX-001–003 | Inline code execution, command substitution, PowerShell encoded cmds, curl-pipe-bash |
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
 | `lifecycle.py` | LF-001 | Postinstall script abuse |
-| `config_level.py` | CL-001–002, EC-001 | Confused deputy, duplicate servers, debug log exposure |
+| `config_level.py` | CL-001–003, EC-001 | Confused deputy, duplicate servers, security feature disable, debug log exposure |
 | `scanner.py` | AT-001, AT-005 | Version pinning audit, excessive server count |
 
 Every finding includes: severity, OWASP MCP Top 10 category, CWE ID, MITRE ATT&CK tactic, and remediation guidance.
@@ -96,8 +96,8 @@ apps/api/           FastAPI backend
     models.py       Pydantic models (Finding, ScanResult, ScanSummary)
     sarif.py        SARIF 2.1.0 formatter (with CWE + ATT&CK)
     cyclonedx.py    CycloneDX 1.6 AI-BOM formatter
-    checks/         39 check implementations
-  tests/            180 tests (unit + property-based + real-world corpus)
+    checks/         40 check implementations
+  tests/            185 tests (unit + property-based + real-world corpus)
 packages/cli/       Go CLI binary (planned — Stage 2)
 ```
 
@@ -125,7 +125,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 180 tests
+.venv/Scripts/pytest tests/ -v    # 185 tests
 
 # Frontend
 cd apps/web
@@ -146,7 +146,7 @@ All 10 categories covered:
 | MCP04 | Supply Chain Attacks | SC-001–005, LF-001 |
 | MCP05 | Command Injection & Execution | EX-001–002, PE-005 |
 | MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
-| MCP07 | Insufficient Authentication | SH-002 |
+| MCP07 | Insufficient Authentication | SH-002, CL-003 |
 | MCP08 | Lack of Audit and Telemetry | AT-001–005 |
 | MCP09 | Shadow MCP Servers | SH-001, SH-003, SH-005 |
 | MCP10 | Context Injection & Over-Sharing | PE-004 |
