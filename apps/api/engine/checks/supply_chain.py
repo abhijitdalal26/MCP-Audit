@@ -3,7 +3,7 @@ from ..models import Finding, Severity, OWASPCategory
 from ..parser import MCPServer
 
 # Confirmed malicious, spoofed, or compromised packages
-# Sources: tooltrust AS-008, ox.security advisory (Apr 2026), community reports
+# Sources: tooltrust AS-008, ox.security advisory (Apr 2026), Trend Micro MCP CVEs, community reports
 KNOWN_MALICIOUS: set[str] = {
     # Confirmed spoofed/fake
     "mcp-server-free",
@@ -12,8 +12,16 @@ KNOWN_MALICIOUS: set[str] = {
     "mcp-filesystem-server",         # spoofs @modelcontextprotocol/server-filesystem
 
     # April 2026 supply chain attack wave (tooltrust AS-008)
-    "litellm",                       # compromised via account takeover — verify current safe version
-    "trivy",                         # npm typosquat of Aqua Security Go binary
+    "litellm",                       # compromised via npm account takeover — verify using pip/PyPI
+    "trivy",                         # npm typosquat of Aqua Security Go binary (legitimate = github release)
+
+    # Known malicious MCP-specific packages (sourced from Trend Micro / Ox Security)
+    "mcp-server-free-filesystem",    # typosquat of official filesystem server
+    "claude-mcp-server",             # impersonation package not from Anthropic
+    "anthropic-mcp",                 # impersonation — Anthropic publishes @anthropic scope, not this
+    "mcp-tool-helper",               # generic impersonation pattern
+    "mcp-server-helper",             # generic impersonation pattern
+    "free-mcp-server",               # generic impersonation pattern
 }
 
 # Packages that were compromised but are now patched — flag if an old version is pinned
@@ -35,9 +43,33 @@ _TYPOSQUAT_PATTERNS: list[tuple[re.Pattern, str]] = [
 ]
 
 # Trusted scopes — everything else flagged as unverified (SC-003)
+# These are verified npm org accounts belonging to well-known companies.
+# Packages from these scopes still need individual review, but the PUBLISHER is established.
 _TRUSTED_SCOPES: set[str] = {
+    # Official MCP ecosystem
     "@modelcontextprotocol",
     "@anthropic",
+    # Major cloud/platform providers with verified npm orgs
+    "@aws-sdk",         # Amazon AWS SDK
+    "@aws-cdk",         # Amazon CDK
+    "@google-cloud",    # Google Cloud
+    "@googleapis",      # Google APIs
+    "@azure",           # Microsoft Azure
+    "@microsoft",       # Microsoft
+    "@openai",          # OpenAI
+    "@github",          # GitHub (octokit etc.)
+    # Developer platforms that publish official MCP servers
+    "@vercel",          # Vercel
+    "@supabase",        # Supabase
+    "@cloudflare",      # Cloudflare
+    "@stripe",          # Stripe
+    "@sentry",          # Sentry
+    "@elastic",         # Elastic/Elasticsearch
+    "@smithery",        # Smithery registry (official MCP marketplace)
+    "@raycast",         # Raycast
+    "@e2b",             # E2B sandbox
+    "@upstash",         # Upstash (Redis)
+    "@linear",          # Linear
 }
 
 

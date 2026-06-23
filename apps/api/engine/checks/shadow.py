@@ -10,9 +10,22 @@ _KNOWN_GOOD_SCOPES: set[str] = {
     "@modelcontextprotocol",
     "@anthropic",
     "@smithery",
-    "@aws",
-    "@google",
-    "@microsoft",
+    # Major verified platforms
+    "@aws", "@aws-sdk", "@aws-cdk",
+    "@google", "@google-cloud", "@googleapis",
+    "@microsoft", "@azure",
+    "@openai",
+    "@github",
+    "@vercel",
+    "@supabase",
+    "@cloudflare",
+    "@stripe",
+    "@sentry",
+    "@elastic",
+    "@raycast",
+    "@e2b",
+    "@upstash",
+    "@linear",
 }
 
 _KNOWN_GOOD_PACKAGES: set[str] = {
@@ -32,7 +45,7 @@ _KNOWN_GOOD_PACKAGES: set[str] = {
     "@modelcontextprotocol/server-gdrive",
     "@modelcontextprotocol/server-time",
     "@modelcontextprotocol/server-everything",
-    # Community well-known packages (verified on Glama/Smithery)
+    # Community well-known packages (verified on Glama/Smithery top-100)
     "mcp-server-sqlite-npx",
     "@upstash/mcp-server",
     "@vercel/mcp-server",
@@ -42,6 +55,25 @@ _KNOWN_GOOD_PACKAGES: set[str] = {
     "mcp-obsidian",
     "mcp-server-qdrant",
     "@e2b/mcp-server",
+    # Additional verified community packages
+    "mcp-remote",
+    "mcp-server-firecrawl",
+    "@firecrawl/mcp-server",
+    "mcp-server-tavily",
+    "mcp-server-perplexity",
+    "mcp-server-linear",
+    "mcp-server-jira",
+    "mcp-server-notion",
+    "mcp-server-slack",
+    "mcp-server-github",
+    "@wong2/mcp-cli",
+    "mcp-server-macos",
+    "mcp-server-playwright",
+    "mcp-server-cursor",
+    "@browserbase/mcp-server-browserbase",
+    "mcp-server-terminal",
+    "mcp-server-docker",
+    "@stripe/agent-toolkit",
 }
 
 # Strip version pin for comparison
