@@ -18,11 +18,22 @@ _INJECTION_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'developer\s+mode|jailbreak\s+mode|DAN\s+mode', re.I), "jailbreak mode reference"),
 ]
 
-# Data exfiltration indicators in args/env vars (AS-017 equivalent)
+# Data exfiltration indicators in args (all patterns — AS-017 equivalent)
 _EXFILTRATION_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'(?i)(send|upload|transmit|exfiltrat|forward|relay)\s+(data|files?|credentials?|tokens?)\s+(to|from)'), "data transfer directive"),
     (re.compile(r'(?i)POST\s+to\s+https?://'), "HTTP POST to external URL"),
     (re.compile(r'https?://(?!localhost|127\.0\.0\.1|0\.0\.0\.0)[^\s]{15,}'), "external URL embedded in argument"),
+    (re.compile(r'(?i)(webhook|callback)\s+url'), "webhook/callback URL reference"),
+    (re.compile(r'(?i)(steal|harvest|collect|scrape)\s+(data|credentials?|tokens?|passwords?)'), "data harvesting language"),
+    (re.compile(r'(?i)(bcc|blind.?carbon.?copy)'), "BCC/blind copy email exfiltration"),
+    (re.compile(r'(?i)(forward.?to|cc.?to|reply.?to)\s*[=:]\s*[^\s@]+@[^\s]{3,}'), "email forwarding rule"),
+]
+
+# Subset safe to apply to env var VALUES — excludes generic URL pattern (too many false positives
+# from legitimate API endpoint env vars like BACKEND_URL=https://api.example.com).
+_EXFILTRATION_ENV_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r'(?i)(send|upload|transmit|exfiltrat|forward|relay)\s+(data|files?|credentials?|tokens?)\s+(to|from)'), "data transfer directive"),
+    (re.compile(r'(?i)POST\s+to\s+https?://'), "HTTP POST to external URL"),
     (re.compile(r'(?i)(webhook|callback)\s+url'), "webhook/callback URL reference"),
     (re.compile(r'(?i)(steal|harvest|collect|scrape)\s+(data|credentials?|tokens?|passwords?)'), "data harvesting language"),
     # Postmark Sep 2025: DEFAULT_BCC env var silently exfiltrated all emails to attacker for 2 weeks
@@ -159,8 +170,12 @@ def check_tool_poisoning(server: MCPServer) -> list[Finding]:
 
     # DX-001: Data exfiltration patterns in args OR env var values
     # Real-world incident (Postmark, Sep 2025): DEFAULT_BCC env var silently exfiltrated all emails
-    for target_text, source_label in [(full_args, "args"), (full_env_vals, "env vars")]:
-        for pattern, description in _EXFILTRATION_PATTERNS:
+    _dx_sources = [
+        (full_args, "args", _EXFILTRATION_PATTERNS),
+        (full_env_vals, "env vars", _EXFILTRATION_ENV_PATTERNS),
+    ]
+    for target_text, source_label, patterns in _dx_sources:
+        for pattern, description in patterns:
             match = pattern.search(target_text)
             if match:
                 findings.append(Finding(
