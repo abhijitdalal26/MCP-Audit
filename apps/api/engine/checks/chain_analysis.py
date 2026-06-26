@@ -119,6 +119,7 @@ def check_cross_server_chains(
     cap_map: dict[str, set[str]] = {
         server.name: _classify_capabilities(server, per_server.get(server.name, []))
         for server in config.servers
+        if not server.disabled
     }
 
     writers = [name for name, caps in cap_map.items() if "filesystem_writer" in caps]

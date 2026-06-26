@@ -6,14 +6,14 @@
   "by_severity": {
     "critical": 7,
     "high": 11,
-    "medium": 10,
+    "medium": 9,
     "low": 0,
-    "info": 0
+    "info": 1
   },
   "findings": [
     {
       "check_id": "SEC-001",
-      "title": "AWS Access Key ID hardcoded in `AWS_ACCESS_KEY_ID`",
+      "title": "AWS Access Key ID hardcoded in `AWS_ACCESS_KEY_ID` (env)",
       "severity": "critical",
       "server": "file-manager",
       "owasp": "MCP01",
@@ -21,7 +21,7 @@
     },
     {
       "check_id": "SEC-001",
-      "title": "Sensitive env var `AWS_ACCESS_KEY_ID` with hardcoded value",
+      "title": "Sensitive env `AWS_ACCESS_KEY_ID` with hardcoded value",
       "severity": "critical",
       "server": "file-manager",
       "owasp": "MCP01",
@@ -29,7 +29,7 @@
     },
     {
       "check_id": "SEC-007",
-      "title": "Cloud instance metadata endpoint (IMDS) URL hardcoded in `BACKEND_URL`",
+      "title": "Cloud instance metadata endpoint (IMDS) URL hardcoded in `BACKEND_URL` (env)",
       "severity": "critical",
       "server": "cloud-helper",
       "owasp": "MCP01",
@@ -196,14 +196,6 @@
       "attack_tactic": null
     },
     {
-      "check_id": "SH-001",
-      "title": "Unregistered MCP server package: `some-mcp-server`",
-      "severity": "medium",
-      "server": "injection-test",
-      "owasp": "MCP09",
-      "attack_tactic": "initial-access"
-    },
-    {
       "check_id": "LF-001",
       "title": "npm lifecycle scripts will run on install: `some-mcp-server@1.0.0`",
       "severity": "medium",
@@ -234,6 +226,14 @@
       "server": "file-manager",
       "owasp": "MCP01",
       "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unverified MCP package: `some-mcp-server`",
+      "severity": "info",
+      "server": "injection-test",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
     }
   ]
 }

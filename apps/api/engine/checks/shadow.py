@@ -127,20 +127,20 @@ def check_shadow(server: MCPServer) -> list[Finding]:
                 if not _is_known(arg):
                     findings.append(Finding(
                         check_id="SH-001",
-                        title=f"Unregistered MCP server package: `{_strip_version(arg)}`",
+                        title=f"Unverified MCP package: `{_strip_version(arg)}`",
                         detail=(
-                            f"Server `{server.name}` installs `{arg}`, which is not found in the "
-                            "known MCP server registry (registry.modelcontextprotocol.io, Glama, or Smithery). "
-                            "Unregistered servers are shadow servers — they may have been installed without "
-                            "proper review and could exfiltrate data or run malicious code without disclosure."
+                            f"Server `{server.name}` installs `{arg}`, which is not in MCPAudit's "
+                            "verified package allowlist (registry.modelcontextprotocol.io, Glama, Smithery). "
+                            "This does not mean the package is malicious — internal, new, or niche community "
+                            "servers are often unlisted. Verify the publisher and source before trusting it."
                         ),
-                        severity=Severity.MEDIUM,
+                        severity=Severity.INFO,
                         owasp=OWASPCategory.MCP09,
                         server_name=server.name,
                         remediation=(
                             f"Verify `{_strip_version(arg)}` against registry.modelcontextprotocol.io and "
-                            "glama.ai/mcp/servers before trusting it. "
-                            "If this server is internal/custom, document its purpose and audit its source code."
+                            "glama.ai/mcp/servers. For internal packages, document ownership and audit "
+                            "the source code. Pin to an exact version after verification."
                         ),
                         engine="custom",
                         attack_tactic="initial-access",
@@ -270,15 +270,16 @@ def check_shadow(server: MCPServer) -> list[Finding]:
             r'authorization|apikey)',
         )
         has_auth_env = any(_AUTH_LIKE_PATTERNS.search(k) for k in server.env)
+        has_auth_header = any(_AUTH_LIKE_PATTERNS.search(k) for k in server.headers)
         has_auth_in_url = bool(re.search(r'[?&](key|token|secret|auth|api_key)=', server.url, re.I))
-        if not has_auth_env and not has_auth_in_url:
+        if not has_auth_env and not has_auth_header and not has_auth_in_url:
             findings.append(Finding(
                 check_id="SH-006",
                 title=f"HTTP MCP server appears to have no authentication: `{server.url}`",
                 detail=(
                     f"Server `{server.name}` connects to `{server.url}` via HTTP/SSE transport "
-                    "but has no auth-related environment variables (API key, token, bearer, etc.) "
-                    "and no credential query parameters in the URL. "
+                    "but has no auth-related environment variables (API key, token, bearer, etc.), "
+                    "no auth headers configured, and no credential query parameters in the URL. "
                     "If this endpoint is network-accessible, any process or user on the network "
                     "can call its tools without proving identity. "
                     "(Research: Censys 2026 — ~40% of 12,520 exposed MCP services have no authentication)"

@@ -3,9 +3,9 @@
 ## What This Is
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
-## Current State (2026-06-23)
-- **Engine**: 49 check IDs across 11 modules, 292/292 tests passing
-- **Research**: 2 research threads complete in `research/` — see `research/RESEARCH_INDEX.md`
+## Current State (2026-06-27)
+- **Engine**: 51 check IDs across 11 modules, 313/313 tests passing
+- **Research**: 2 research threads complete in `docs/security-research/` — see `docs/security-research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js minimal UI with risk grade (A-F) display
 - **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
@@ -41,7 +41,19 @@ apps/api/                  FastAPI backend
     test_advanced.py       14 lifecycle/risk-score/CycloneDX tests
     test_config_level.py   8 config-level checks tests
     test_new_checks.py     44 tests for SH-004/005, SC-005, AT-004, PE-005, CWE IDs
+    test_approval_headers.py  approval-headers tests (new, unstaged)
 packages/cli/              Go CLI binary (NOT YET BUILT — Stage 2)
+docs/
+  vault/                   Obsidian workspace — personal notes, build logs (gitignored)
+  product-research/        Pre-build strategy/competitive research markdown (gitignored)
+  security-research/       Technical research modules — unicode steganography, cross-server chains (gitignored)
+  specs/                   Canonical check specifications — git-tracked
+    checks-reference.md    All 51 check IDs: severity, OWASP, CWE, description
+  architecture/            ADRs and system design docs — git-tracked
+    EXECUTION-PLAN.md      Master plan for website + CLI execution (read this before starting Phase 2+)
+    ADR-001-website-design.md   Tool-first single-page design decision
+    ADR-002-deployment.md  Vercel (web) + Railway (API) deployment strategy
+    ADR-003-cli-design.md  Go thin HTTP client CLI architecture
 ```
 
 ## Key Architecture Decisions
@@ -70,7 +82,7 @@ cd apps/api
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
 
-# Tests (292/292)
+# Tests (313/313)
 .venv/Scripts/pytest tests/ -v
 
 # Frontend
@@ -78,16 +90,16 @@ cd apps/web
 npm install && npm run dev   # → http://localhost:3000
 ```
 
-## Security Check IDs (49 total)
+## Security Check IDs (51 total)
 All checks mapped to OWASP MCP Top 10:
 
 | Module | IDs | OWASP |
 |---|---|---|
-| secrets.py | SEC-001–007 (incl. HTTP basic auth, IMDS endpoints) | MCP01, MCP04 |
+| secrets.py | SEC-001–008 (incl. HTTP basic auth, IMDS endpoints, credentials in URL) | MCP01, MCP04 |
 | supply_chain.py | SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override) | MCP04 |
 | osv_lookup.py | SC-004 | MCP04 |
 | tool_poisoning.py | PI-001–005, DX-001 (incl. invisible Unicode, env var scan) | MCP03, MCP06 |
-| privilege.py | PE-001–008 (incl. path traversal, permission bypass, sudo) | MCP02, MCP05, MCP10 |
+| privilege.py | PE-001–009 (incl. path traversal, permission bypass, sudo, dangerous Docker caps) | MCP02, MCP05, MCP10 |
 | shadow.py | SH-001–006 (incl. unauthenticated SSE endpoint detection) | MCP03, MCP07, MCP09 |
 | code_execution.py | EX-001–003 (incl. PowerShell encoded cmd, curl|bash) | MCP05 |
 | audit.py | AT-002–004 | MCP08 |
@@ -116,6 +128,15 @@ Full check specs: documentaion/progress/builds_log.md (not in git — Obsidian v
 ## Naming
 Project name: **MCPAudit** | GitHub: `abhijitdalal26/MCP-Audit` (public)
 
-## Important: Directory Rules
-- `documentaion/` — NEVER push to GitHub (in .gitignore). Never modify `documentaion/research/`.
-- `docs/research/` — git-tracked copy of research (read-only reference)
+## Documentation Directory Guide
+All documentation lives under `docs/`. Each subdirectory has a specific purpose — write new content in the right place:
+
+| Directory | Git? | Purpose — what goes here |
+|---|---|---|
+| `docs/vault/` | No | Obsidian personal workspace — build logs, session notes, findings, raw ideas. NEVER modify or delete anything here. |
+| `docs/product-research/` | No | Pre-build research reference — competitive analysis, naming, pitch, tech stack decisions, roadmap (00–10 markdown files). Read-only reference. |
+| `docs/security-research/` | No | Technical security research that fed into check implementations — unicode steganography, cross-server chain analysis (Python + RESEARCH.md). |
+| `docs/specs/` | Yes | Canonical check specifications — document each check ID (what it fires on, CWE mapping, OWASP category, false positive guidance). Add a file per module or per check. |
+| `docs/architecture/` | Yes | Architecture decision records (ADRs), system design docs, data flow diagrams, stage roadmap rationale. |
+
+**Rule:** If it's a personal note or reference → `vault/`. If it's a check definition → `specs/`. If it's a design decision → `architecture/`.

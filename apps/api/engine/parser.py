@@ -2,7 +2,9 @@ import json
 import re
 import hashlib
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
+
+AutoApproveValue = Union[bool, str, list[str]]
 
 
 class MCPServer(BaseModel):
@@ -10,8 +12,11 @@ class MCPServer(BaseModel):
     command: Optional[str] = None
     args: list[str] = []
     env: dict[str, str] = {}
+    headers: dict[str, str] = {}
     url: Optional[str] = None
     transport: Optional[str] = None
+    auto_approve: Optional[AutoApproveValue] = None
+    disabled: bool = False
 
 
 class MCPConfig(BaseModel):
@@ -97,6 +102,39 @@ def _extract_first_json_object(text: str) -> str:
     return text[start:] if start != -1 else text
 
 
+def _parse_headers(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items()}
+
+
+def _parse_auto_approve(server_data: dict) -> Optional[AutoApproveValue]:
+    """Parse autoApprove / alwaysAllow from Cursor or Claude Desktop configs."""
+    raw = server_data.get("autoApprove")
+    if raw is None:
+        raw = server_data.get("alwaysAllow")
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        return [str(item) for item in raw]
+    return None
+
+
+def _parse_disabled(server_data: dict) -> bool:
+    raw = server_data.get("disabled")
+    if raw is None:
+        return False
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() in ("true", "1", "yes", "on")
+    return bool(raw)
+
+
 def parse_config(config_json: str) -> MCPConfig:
     # Pre-process: strip JSONC comments, then extract first JSON object
     # (some real-world files contain multiple objects or comment headers)
@@ -125,8 +163,11 @@ def parse_config(config_json: str) -> MCPConfig:
             command=server_data.get("command"),
             args=[str(a) for a in server_data.get("args", [])],
             env={k: str(v) for k, v in server_data.get("env", {}).items()},
+            headers=_parse_headers(server_data.get("headers")),
             url=server_data.get("url"),
             transport=server_data.get("transport"),
+            auto_approve=_parse_auto_approve(server_data),
+            disabled=_parse_disabled(server_data),
         ))
 
     return MCPConfig(config_hash=config_hash, servers=servers)

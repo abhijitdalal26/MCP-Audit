@@ -34,7 +34,9 @@ def scan(config: MCPConfig) -> ScanResult:
     # Collect per-server findings so config-level checks can cross-reference them
     per_server: dict[str, list[Finding]] = {}
 
-    for server in config.servers:
+    active_servers = [s for s in config.servers if not s.disabled]
+
+    for server in active_servers:
         server_findings: list[Finding] = []
         server_findings.extend(check_secrets(server))
         server_findings.extend(check_supply_chain(server))
@@ -55,11 +57,11 @@ def scan(config: MCPConfig) -> ScanResult:
     # Cross-server capability chain analysis (Research 2)
     all_findings.extend(check_cross_server_chains(config, per_server))
 
-    n = len(config.servers)
+    n = len(active_servers)
 
     # AT-001: Systemic absence of version pinning across the entire config
     if n >= 2:
-        pinned_count = sum(1 for s in config.servers if _any_pinned(s))
+        pinned_count = sum(1 for s in active_servers if _any_pinned(s))
         if pinned_count == 0:
             all_findings.append(Finding(
                 check_id="AT-001",
@@ -86,7 +88,7 @@ def scan(config: MCPConfig) -> ScanResult:
     # pull a new version on every restart. A compromised image registry or image tag
     # override gives attackers a silent code injection vector.
     import os as _os
-    for server in config.servers:
+    for server in active_servers:
         cmd_base = _os.path.basename(server.command or "").lower()
         if "." in cmd_base:
             cmd_base = cmd_base.rsplit(".", 1)[0]

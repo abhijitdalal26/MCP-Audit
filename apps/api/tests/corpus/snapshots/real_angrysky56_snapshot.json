@@ -1,14 +1,14 @@
 {
   "source_file": "real_angrysky56.json",
-  "risk_score": 98,
+  "risk_score": 94,
   "risk_grade": "F",
   "total_findings": 21,
   "by_severity": {
     "critical": 0,
     "high": 3,
-    "medium": 17,
+    "medium": 16,
     "low": 0,
-    "info": 1
+    "info": 2
   },
   "findings": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "check_id": "SEC-004",
-      "title": "Sensitive env var `SLACK_BOT_TOKEN` with hardcoded value",
+      "title": "Sensitive env `SLACK_BOT_TOKEN` with hardcoded value",
       "severity": "high",
       "server": "slack",
       "owasp": "MCP01",
@@ -82,14 +82,6 @@
       "server": "server-win-cli",
       "owasp": "MCP04",
       "attack_tactic": null
-    },
-    {
-      "check_id": "SH-001",
-      "title": "Unregistered MCP server package: `@simonb97/server-win-cli`",
-      "severity": "medium",
-      "server": "server-win-cli",
-      "owasp": "MCP09",
-      "attack_tactic": "initial-access"
     },
     {
       "check_id": "LF-001",
@@ -170,6 +162,14 @@
       "server": "(all servers)",
       "owasp": "MCP08",
       "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unverified MCP package: `@simonb97/server-win-cli`",
+      "severity": "info",
+      "server": "server-win-cli",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
     },
     {
       "check_id": "AT-005",

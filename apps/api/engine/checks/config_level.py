@@ -4,6 +4,7 @@ These run against the full MCPConfig, not individual servers.
 CL-001: Confused deputy risk — one server has secrets, another has shell/exec
 CL-002: Duplicate server configurations (masked identity/shadowing)
 CL-003: Security feature disabled via env var (TLS bypass, auth disable, debug mode)
+CL-004: autoApprove bypasses user confirmation for tool calls
 EC-001: Debug logging + secret credentials in same server (log exfiltration risk)
 """
 import re
@@ -58,6 +59,7 @@ def check_config_level(config: MCPConfig, per_server_findings: dict[str, list[Fi
     _check_duplicate_servers(config, findings)
     _check_debug_logging_exposure(config, per_server_findings, findings)
     _check_security_feature_disabled(config, findings)
+    _check_auto_approve(config, findings)
 
     return findings
 
@@ -257,4 +259,84 @@ def _check_debug_logging_exposure(config: MCPConfig, per_server_findings: dict[s
                 ),
                 engine="custom",
                 cwe_id="CWE-532",
+            ))
+
+
+def _is_wildcard_auto_approve(value: object) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip() in ("*", "all", "true")
+    if isinstance(value, list):
+        lowered = {str(item).strip().lower() for item in value}
+        return "*" in lowered or "all" in lowered
+    return False
+
+
+def _auto_approve_tool_count(value: object) -> int:
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, str) and value.strip() not in ("*", "all"):
+        return 1
+    return 0
+
+
+def _check_auto_approve(config: MCPConfig, out: list[Finding]) -> None:
+    """CL-004: autoApprove / alwaysAllow bypasses per-tool user confirmation in Cursor/Claude."""
+    for server in config.servers:
+        if server.disabled or server.auto_approve is None:
+            continue
+
+        if _is_wildcard_auto_approve(server.auto_approve):
+            out.append(Finding(
+                check_id="CL-004",
+                title=f"Wildcard autoApprove bypasses all tool confirmations in `{server.name}`",
+                detail=(
+                    f"Server `{server.name}` has `autoApprove` set to approve every tool call "
+                    "without user confirmation. This removes the last line of defense against "
+                    "tool poisoning, prompt injection, and malicious MCP behavior — the AI can "
+                    "invoke any tool silently, including filesystem writes, shell commands, and "
+                    "network requests."
+                ),
+                severity=Severity.CRITICAL,
+                owasp=OWASPCategory.MCP07,
+                server_name=server.name,
+                remediation=(
+                    "Remove `autoApprove: \"*\"` (or `alwaysAllow: true`) from this server entry. "
+                    "Approve tools individually after reviewing what each one does. "
+                    "Never use wildcard auto-approve for servers with filesystem, shell, or network access."
+                ),
+                engine="custom",
+                attack_tactic="defense-evasion",
+                cwe_id="CWE-284",
+            ))
+            continue
+
+        tool_count = _auto_approve_tool_count(server.auto_approve)
+        if tool_count > 0:
+            preview = ""
+            if isinstance(server.auto_approve, list):
+                shown = ", ".join(f"`{t}`" for t in server.auto_approve[:5])
+                extra = f" (+{tool_count - 5} more)" if tool_count > 5 else ""
+                preview = f" Tools: {shown}{extra}."
+            out.append(Finding(
+                check_id="CL-004",
+                title=f"Partial autoApprove list ({tool_count} tool(s)) in `{server.name}`",
+                detail=(
+                    f"Server `{server.name}` auto-approves {tool_count} tool(s) without confirmation."
+                    f"{preview} "
+                    "Pre-approved tools run silently — if the server's tool list changes via a "
+                    "package update, new dangerous tools may inherit approval without your review."
+                ),
+                severity=Severity.HIGH if tool_count >= 5 else Severity.MEDIUM,
+                owasp=OWASPCategory.MCP07,
+                server_name=server.name,
+                remediation=(
+                    "Remove the `autoApprove` list and confirm each tool call manually until you "
+                    "trust this server. If you need convenience, auto-approve only read-only tools "
+                    "and re-audit after every package version change."
+                ),
+                engine="custom",
+                attack_tactic="defense-evasion",
+                cwe_id="CWE-284",
             ))

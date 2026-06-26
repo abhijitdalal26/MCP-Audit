@@ -6,9 +6,9 @@
   "by_severity": {
     "critical": 0,
     "high": 3,
-    "medium": 30,
+    "medium": 26,
     "low": 0,
-    "info": 1
+    "info": 5
   },
   "findings": [
     {
@@ -140,22 +140,6 @@
       "attack_tactic": null
     },
     {
-      "check_id": "SH-001",
-      "title": "Unregistered MCP server package: `@browsermcp/mcp/latest`",
-      "severity": "medium",
-      "server": "browsermcp",
-      "owasp": "MCP09",
-      "attack_tactic": "initial-access"
-    },
-    {
-      "check_id": "SH-001",
-      "title": "Unregistered MCP server package: `github:FabianGenell/pdf-mcp-server`",
-      "severity": "medium",
-      "server": "pdf-generator",
-      "owasp": "MCP09",
-      "attack_tactic": "initial-access"
-    },
-    {
       "check_id": "SEC-006",
       "title": "Unpinned package version: `npx`",
       "severity": "medium",
@@ -188,14 +172,6 @@
       "attack_tactic": null
     },
     {
-      "check_id": "SH-001",
-      "title": "Unregistered MCP server package: `@playwright/mcp/latest`",
-      "severity": "medium",
-      "server": "playwright",
-      "owasp": "MCP09",
-      "attack_tactic": "initial-access"
-    },
-    {
       "check_id": "SEC-006",
       "title": "Unpinned package version: `@modelcontextprotocol/server-puppeteer`",
       "severity": "medium",
@@ -226,14 +202,6 @@
       "server": "mysql",
       "owasp": "MCP04",
       "attack_tactic": null
-    },
-    {
-      "check_id": "SH-001",
-      "title": "Unregistered MCP server package: `@benborla29/mcp-server-mysql`",
-      "severity": "medium",
-      "server": "mysql",
-      "owasp": "MCP09",
-      "attack_tactic": "initial-access"
     },
     {
       "check_id": "LF-001",
@@ -274,6 +242,38 @@
       "server": "(all servers)",
       "owasp": "MCP08",
       "attack_tactic": null
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unverified MCP package: `@browsermcp/mcp/latest`",
+      "severity": "info",
+      "server": "browsermcp",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unverified MCP package: `github:FabianGenell/pdf-mcp-server`",
+      "severity": "info",
+      "server": "pdf-generator",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unverified MCP package: `@playwright/mcp/latest`",
+      "severity": "info",
+      "server": "playwright",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
+    },
+    {
+      "check_id": "SH-001",
+      "title": "Unverified MCP package: `@benborla29/mcp-server-mysql`",
+      "severity": "info",
+      "server": "mysql",
+      "owasp": "MCP09",
+      "attack_tactic": "initial-access"
     },
     {
       "check_id": "AT-005",

@@ -16,7 +16,7 @@ class TestShadowSH001:
         findings = check_shadow(server)
         assert any(f.check_id == "SH-001" for f in findings)
         sh1 = [f for f in findings if f.check_id == "SH-001"]
-        assert sh1[0].severity == Severity.MEDIUM
+        assert sh1[0].severity == Severity.INFO
 
     def test_official_package_not_flagged(self):
         server = make_server(args=["-y", "@modelcontextprotocol/server-filesystem@1.0.0"])

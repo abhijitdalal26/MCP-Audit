@@ -1,7 +1,7 @@
 # MCPAudit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)](apps/api/tests/)
+[![Tests](https://img.shields.io/badge/tests-313%20passing-brightgreen)](apps/api/tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](apps/api/)
 [![OWASP MCP Top 10](https://img.shields.io/badge/OWASP%20MCP-Top%2010%20covered-red)](https://owasp.org/)
 
@@ -13,7 +13,7 @@ Security auditor for Model Context Protocol (MCP) server configurations. Paste y
 
 Every MCP server you add to Claude Desktop or Cursor gets access to your filesystem, shell, browser, or APIs. MCPAudit scans your config and tells you what risks each server introduces — before you trust it.
 
-**49 checks across 11 modules:**
+**50 checks across 11 modules:**
 
 | Module | Check IDs | Category |
 |--------|-----------|----------|
@@ -27,7 +27,7 @@ Every MCP server you add to Claude Desktop or Cursor gets access to your filesys
 | `code_execution.py` | EX-001–003 | Inline code execution, command substitution, PowerShell encoded cmds, curl-pipe-bash |
 | `audit.py` | AT-002–004 | Transport config, network binding (NeighborJack) |
 | `lifecycle.py` | LF-001 | Postinstall script abuse |
-| `config_level.py` | CL-001–003, EC-001 | Confused deputy, duplicate servers, security feature disable, debug log exposure |
+| `config_level.py` | CL-001–004, EC-001 | Confused deputy, duplicate servers, security feature disable, autoApprove bypass, debug log exposure |
 | `scanner.py` | AT-001, AT-005–006 | Version pinning audit, excessive server count, Docker image pinning |
 
 Every finding includes: severity, OWASP MCP Top 10 category, CWE ID, MITRE ATT&CK tactic, and remediation guidance.
@@ -126,7 +126,7 @@ python -m venv .venv
 uvicorn main:app --reload --port 8000
 
 # Tests
-.venv/Scripts/pytest tests/ -v    # 292 tests
+.venv/Scripts/pytest tests/ -v    # 313 tests
 
 # Frontend
 cd apps/web
@@ -147,10 +147,29 @@ All 10 categories covered:
 | MCP04 | Supply Chain Attacks | SC-001–007, LF-001 |
 | MCP05 | Command Injection & Execution | EX-001–002, PE-005 |
 | MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
-| MCP07 | Insufficient Authentication | SH-002, SH-006, CL-003 |
+| MCP07 | Insufficient Authentication | SH-002, SH-006, CL-003, CL-004 |
 | MCP08 | Lack of Audit and Telemetry | AT-001–005 |
 | MCP09 | Shadow MCP Servers | SH-001, SH-003, SH-005 |
 | MCP10 | Context Injection & Over-Sharing | PE-004 |
+
+---
+
+## Scope & Limitations
+
+MCPAudit is a **static config scanner**. It analyzes the JSON you paste — it does not connect to live MCP servers unless you explicitly add that in a future release.
+
+| Capability | Status |
+|------------|--------|
+| Claude Desktop / Cursor `mcpServers` JSON | Supported (including JSONC comments) |
+| `autoApprove`, `disabled`, `headers` | Supported |
+| Secret / supply-chain / privilege checks on config fields | Supported |
+| SARIF 2.1.0 + CycloneDX 1.6 AI-BOM export | Supported |
+| Live tool description fetch (runtime MCP connection) | Not yet — static args/env only |
+| MCP server source-code scanning | Not yet — use [mcp-audit source-scan](https://github.com/apisec-inc/mcp-audit) |
+| CVE lookup (SC-004) | Requires pinned package versions |
+| `SH-001` unverified package | INFO severity — flags packages outside the verified allowlist, not proof of malice |
+
+Disabled servers (`"disabled": true`) are skipped during scanning.
 
 ---
 

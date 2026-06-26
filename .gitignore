@@ -44,9 +44,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Local research vaults — never push
-documentaion/
-docs/research/
+# Local-only docs — never push
+docs/vault/
+docs/product-research/
+docs/security-research/
 
 # OS
 .DS_Store

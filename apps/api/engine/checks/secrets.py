@@ -116,64 +116,14 @@ def check_secrets(server: MCPServer) -> list[Finding]:
     seen: set[str] = set()
 
     for env_key, env_val in server.env.items():
-        if not env_val or _PLACEHOLDER_RE.match(env_val):
-            continue
+        _scan_credential_field(
+            findings, seen, server, env_key, env_val, "environment variable", "env",
+        )
 
-        # Match value against known secret patterns
-        for check_id, title, pattern, severity in _VALUE_PATTERNS:
-            dedup = f"{check_id}:{server.name}:{env_key}:val"
-            if dedup in seen:
-                continue
-            if pattern.search(env_val):
-                seen.add(dedup)
-                findings.append(Finding(
-                    check_id=check_id,
-                    title=f"{title} hardcoded in `{env_key}`",
-                    detail=(
-                        f"Server `{server.name}` has what appears to be a {title.lower()} "
-                        f"hardcoded in environment variable `{env_key}` (value: `{_mask(env_val)}`). "
-                        "Credentials in MCP config files are readable by anyone with file system access "
-                        "and are often synced to cloud backup or version control."
-                    ),
-                    severity=severity,
-                    owasp=OWASPCategory.MCP01,
-                    server_name=server.name,
-                    remediation=(
-                        f"Remove the hardcoded value from `{env_key}`. "
-                        "Reference a secrets manager (e.g. 1Password CLI, AWS Secrets Manager, Vault) "
-                        "or set the variable in your shell profile and reference it with `$ENV_VAR` syntax "
-                        "so the plaintext never appears in the config file."
-                    ),
-                    engine="custom",
-                    cwe_id=_CHECK_CWE.get(check_id),
-                ))
-                break
-
-        # Flag by suspicious var name even if value pattern doesn't match
-        dedup_name = f"name:{server.name}:{env_key}"
-        if dedup_name not in seen:
-            for check_id, pattern_re, severity in _SENSITIVE_VAR_NAMES:
-                if pattern_re.search(env_key):
-                    seen.add(dedup_name)
-                    findings.append(Finding(
-                        check_id=check_id,
-                        title=f"Sensitive env var `{env_key}` with hardcoded value",
-                        detail=(
-                            f"Server `{server.name}` sets `{env_key}`, which by name indicates "
-                            "it holds a secret credential. Hardcoding secrets in MCP configs risks "
-                            "accidental exposure in backups, logs, or version control."
-                        ),
-                        severity=severity,
-                        owasp=OWASPCategory.MCP01,
-                        server_name=server.name,
-                        remediation=(
-                            f"Ensure `{env_key}` is not stored in plaintext in the config. "
-                            "Use environment variable substitution or a secrets management tool."
-                        ),
-                        engine="custom",
-                        cwe_id=_CHECK_CWE.get(check_id),
-                    ))
-                    break
+    for header_key, header_val in server.headers.items():
+        _scan_credential_field(
+            findings, seen, server, header_key, header_val, "HTTP header", "header",
+        )
 
     # Scan args for embedded secrets (--api-key sk-abc123 pattern)
     # Some servers accept credentials as CLI flags, which is equally dangerous
@@ -267,6 +217,72 @@ def check_secrets(server: MCPServer) -> list[Finding]:
             ))
 
     return findings
+
+
+def _scan_credential_field(
+    findings: list[Finding],
+    seen: set[str],
+    server: MCPServer,
+    field_key: str,
+    field_val: str,
+    field_label: str,
+    field_kind: str,
+) -> None:
+    if not field_val or _PLACEHOLDER_RE.match(field_val):
+        return
+
+    for check_id, title, pattern, severity in _VALUE_PATTERNS:
+        dedup = f"{check_id}:{server.name}:{field_kind}:{field_key}:val"
+        if dedup in seen:
+            continue
+        if pattern.search(field_val):
+            seen.add(dedup)
+            findings.append(Finding(
+                check_id=check_id,
+                title=f"{title} hardcoded in `{field_key}` ({field_kind})",
+                detail=(
+                    f"Server `{server.name}` has what appears to be a {title.lower()} "
+                    f"hardcoded in {field_label} `{field_key}` (value: `{_mask(field_val)}`). "
+                    "Credentials in MCP config files are readable by anyone with file system access "
+                    "and are often synced to cloud backup or version control."
+                ),
+                severity=severity,
+                owasp=OWASPCategory.MCP01,
+                server_name=server.name,
+                remediation=(
+                    f"Remove the hardcoded value from `{field_key}`. "
+                    "Reference a secrets manager or environment variable substitution "
+                    "so the plaintext never appears in the config file."
+                ),
+                engine="custom",
+                cwe_id=_CHECK_CWE.get(check_id),
+            ))
+            break
+
+    dedup_name = f"name:{server.name}:{field_kind}:{field_key}"
+    if dedup_name not in seen:
+        for check_id, pattern_re, severity in _SENSITIVE_VAR_NAMES:
+            if pattern_re.search(field_key):
+                seen.add(dedup_name)
+                findings.append(Finding(
+                    check_id=check_id,
+                    title=f"Sensitive {field_kind} `{field_key}` with hardcoded value",
+                    detail=(
+                        f"Server `{server.name}` sets `{field_key}` in {field_label}, which by name "
+                        "indicates it holds a secret credential. Hardcoding secrets in MCP configs "
+                        "risks accidental exposure in backups, logs, or version control."
+                    ),
+                    severity=severity,
+                    owasp=OWASPCategory.MCP01,
+                    server_name=server.name,
+                    remediation=(
+                        f"Ensure `{field_key}` is not stored in plaintext in the config. "
+                        "Use environment variable substitution or a secrets management tool."
+                    ),
+                    engine="custom",
+                    cwe_id=_CHECK_CWE.get(check_id),
+                ))
+                break
 
 
 _DIST_TAG_RE = re.compile(r'^(latest|next|beta|alpha|canary|rc|nightly|stable|dev|edge|experimental)$', re.I)
