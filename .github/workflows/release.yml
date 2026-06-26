@@ -1,0 +1,79 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release CLI binaries
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: packages/cli/go.sum
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build cross-platform binaries
+        run: |
+          mkdir -p dist
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          GOOS=linux   GOARCH=amd64  go build -ldflags="-X main.Version=${VERSION} -s -w" -o dist/mcpaudit-linux-amd64 .
+          GOOS=linux   GOARCH=arm64  go build -ldflags="-X main.Version=${VERSION} -s -w" -o dist/mcpaudit-linux-arm64 .
+          GOOS=darwin  GOARCH=amd64  go build -ldflags="-X main.Version=${VERSION} -s -w" -o dist/mcpaudit-darwin-amd64 .
+          GOOS=darwin  GOARCH=arm64  go build -ldflags="-X main.Version=${VERSION} -s -w" -o dist/mcpaudit-darwin-arm64 .
+          GOOS=windows GOARCH=amd64  go build -ldflags="-X main.Version=${VERSION} -s -w" -o dist/mcpaudit-windows-amd64.exe .
+
+          ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "MCPAudit CLI ${{ github.ref_name }}"
+          body: |
+            ## MCPAudit CLI ${{ github.ref_name }}
+
+            Thin HTTP client for the MCPAudit API. Calls `https://api.mcpaudit.app` by default.
+
+            ### Install
+
+            **macOS (Apple Silicon)**
+            ```bash
+            curl -sSfL https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/mcpaudit-darwin-arm64 -o /usr/local/bin/mcpaudit && chmod +x /usr/local/bin/mcpaudit
+            ```
+
+            **macOS (Intel)**
+            ```bash
+            curl -sSfL https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/mcpaudit-darwin-amd64 -o /usr/local/bin/mcpaudit && chmod +x /usr/local/bin/mcpaudit
+            ```
+
+            **Linux**
+            ```bash
+            curl -sSfL https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/mcpaudit-linux-amd64 -o /usr/local/bin/mcpaudit && chmod +x /usr/local/bin/mcpaudit
+            ```
+
+            ### Usage
+            ```
+            mcpaudit scan ~/.claude/claude_desktop_config.json
+            mcpaudit scan mcp.json --format sarif > results.sarif
+            mcpaudit scan mcp.json --fail-on high
+            ```
+          files: packages/cli/dist/*
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

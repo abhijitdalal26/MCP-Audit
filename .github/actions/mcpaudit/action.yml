@@ -1,0 +1,52 @@
+name: MCPAudit Security Scan
+description: Scan MCP server configs for security vulnerabilities (OWASP MCP Top 10)
+author: abhijitdalal26
+
+branding:
+  icon: shield
+  color: red
+
+inputs:
+  config-path:
+    description: Path to MCP config file (claude_desktop_config.json or .cursor/mcp.json)
+    required: false
+    default: claude_desktop_config.json
+  fail-on:
+    description: Minimum severity to fail CI (critical/high/medium/low/info/none)
+    required: false
+    default: critical
+  api-url:
+    description: MCPAudit API URL (override for self-hosted instances)
+    required: false
+    default: https://api.mcpaudit.app
+  format:
+    description: Output format (text/json/sarif/bom)
+    required: false
+    default: text
+
+runs:
+  using: composite
+  steps:
+    - name: Download mcpaudit CLI
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          arm64|aarch64) ARCH="arm64" ;;
+        esac
+        BINARY="mcpaudit-${OS}-${ARCH}"
+        curl -sSfL \
+          "https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/${BINARY}" \
+          -o /usr/local/bin/mcpaudit
+        chmod +x /usr/local/bin/mcpaudit
+        mcpaudit version
+
+    - name: Run MCPAudit scan
+      shell: bash
+      run: |
+        mcpaudit scan "${{ inputs.config-path }}" \
+          --api-url "${{ inputs.api-url }}" \
+          --fail-on "${{ inputs.fail-on }}" \
+          --format "${{ inputs.format }}"
