@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -9,45 +10,51 @@ import (
 	"time"
 
 	"github.com/abhijitdalal26/MCP-Audit/cli/internal/client"
+	"github.com/abhijitdalal26/MCP-Audit/cli/internal/engine"
 	"github.com/abhijitdalal26/MCP-Audit/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
 var (
-	flagAPIURL  string
-	flagFormat  string
-	flagOutput  string
-	flagFailOn  string
-	flagNoColor bool
-	flagTimeout int
-	flagStdin   bool
+	flagAPIURL    string
+	flagFormat    string
+	flagOutput    string
+	flagFailOn    string
+	flagNoColor   bool
+	flagTimeout   int
+	flagStdin     bool
+	flagNoNetwork bool
 )
 
 func init() {
 	rootCmd.AddCommand(scanCmd)
 
-	scanCmd.Flags().StringVar(&flagAPIURL, "api-url", "https://api.mcpaudit.app", "MCPAudit API base URL")
+	// Empty default = offline mode (local engine). Set --api-url to use remote API.
+	scanCmd.Flags().StringVar(&flagAPIURL, "api-url", "", "MCPAudit API base URL (default: run locally, no data sent)")
 	scanCmd.Flags().StringVar(&flagFormat, "format", "text", "Output format: text, json, sarif, bom")
 	scanCmd.Flags().StringVar(&flagOutput, "output", "", "Write output to file (default: stdout)")
 	scanCmd.Flags().StringVar(&flagFailOn, "fail-on", "critical", "Exit 1 if findings at or above severity (critical/high/medium/low/info/none)")
 	scanCmd.Flags().BoolVar(&flagNoColor, "no-color", false, "Disable ANSI color output")
 	scanCmd.Flags().IntVar(&flagTimeout, "timeout", 30, "HTTP timeout in seconds")
 	scanCmd.Flags().BoolVar(&flagStdin, "stdin", false, "Read MCP config JSON from stdin")
+	scanCmd.Flags().BoolVar(&flagNoNetwork, "no-network", false, "Skip OSV.dev CVE lookup (faster, fully offline)")
 }
 
 var scanCmd = &cobra.Command{
 	Use:   "scan [file]",
 	Short: "Scan an MCP config file for security vulnerabilities",
 	Long: `Scan a claude_desktop_config.json or .cursor/mcp.json for security issues.
+By default the scan runs entirely offline — your config never leaves your machine.
 
 Examples:
   mcpaudit scan ~/.claude/claude_desktop_config.json
   mcpaudit scan mcp.json --format sarif > results.sarif
   mcpaudit scan mcp.json --fail-on high
-  mcpaudit scan mcp.json --api-url http://localhost:8000
+  mcpaudit scan mcp.json --no-network          # skip OSV CVE lookup
+  mcpaudit scan mcp.json --api-url https://api.mcpaudit.app  # use remote API
   cat mcp.json | mcpaudit scan --stdin`,
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runScan,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runScan,
 }
 
 func runScan(_ *cobra.Command, args []string) error {
@@ -84,12 +91,64 @@ func runScan(_ *cobra.Command, args []string) error {
 		w = f
 	}
 
+	// ── Route: local engine (default) or remote API ──────────────────────────
+	if flagAPIURL == "" {
+		return runLocalScan(w, configJSON, configPath)
+	}
+	return runRemoteScan(w, configJSON, configPath)
+}
+
+// runLocalScan executes the embedded Go engine — zero data leaves the machine.
+func runLocalScan(w io.Writer, configJSON, _ string) error {
+	opts := engine.ScanOptions{
+		NoNetwork:  flagNoNetwork,
+		OSVTimeout: time.Duration(flagTimeout) * time.Second,
+	}
+
+	switch strings.ToLower(flagFormat) {
+	case "sarif":
+		data, err := engine.ScanToSARIF(configJSON, opts)
+		if err != nil {
+			return fmt.Errorf("scan: %w", err)
+		}
+		_, err = w.Write(data)
+		return err
+
+	case "bom":
+		data, err := engine.ScanToBOM(configJSON, opts)
+		if err != nil {
+			return fmt.Errorf("scan: %w", err)
+		}
+		_, err = w.Write(data)
+		return err
+	}
+
+	result, err := engine.Scan(configJSON, opts)
+	if err != nil {
+		return fmt.Errorf("scan: %w", err)
+	}
+
+	// Convert engine.ScanResult to client.ScanResult for shared output formatters.
+	cr := engineToClientResult(result)
+
+	switch strings.ToLower(flagFormat) {
+	case "json":
+		if err := output.PrintJSON(w, cr); err != nil {
+			return err
+		}
+	default:
+		output.PrintText(w, cr, version, flagNoColor)
+	}
+	return checkFailOn(cr, flagFailOn)
+}
+
+// runRemoteScan sends the config to the MCPAudit API (user opted in via --api-url).
+func runRemoteScan(w io.Writer, configJSON, configPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(flagTimeout)*time.Second)
 	defer cancel()
 
 	c := client.New(flagAPIURL, flagTimeout)
 
-	// ── SARIF / BOM: hit export endpoints directly ────────────────────────────
 	switch strings.ToLower(flagFormat) {
 	case "sarif":
 		data, _, err := c.ScanRaw(ctx, "/scan/sarif", configJSON, configPath)
@@ -108,7 +167,6 @@ func runScan(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	// ── text / json: call /scan ───────────────────────────────────────────────
 	result, err := c.Scan(ctx, configJSON, configPath)
 	if err != nil {
 		return err
@@ -119,11 +177,25 @@ func runScan(_ *cobra.Command, args []string) error {
 		if err := output.PrintJSON(w, result); err != nil {
 			return err
 		}
-	default: // "text"
+	default:
 		output.PrintText(w, result, version, flagNoColor)
 	}
-
 	return checkFailOn(result, flagFailOn)
+}
+
+// engineToClientResult converts the local engine's ScanResult to the client type
+// so the shared text/json output formatters work for both local and remote modes.
+// Both structs share identical json tags so a round-trip marshal works correctly.
+func engineToClientResult(r any) *client.ScanResult {
+	data, err := json.Marshal(r)
+	if err != nil {
+		panic("engine result marshal: " + err.Error())
+	}
+	var cr client.ScanResult
+	if err := json.Unmarshal(data, &cr); err != nil {
+		panic("client result unmarshal: " + err.Error())
+	}
+	return &cr
 }
 
 // severityRank maps severity to a rank (lower = more severe).

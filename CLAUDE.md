@@ -7,13 +7,22 @@ A web SaaS that audits Model Context Protocol (MCP) server configurations for se
 - **Engine**: 51 check IDs across 11 modules, 313/313 tests passing
 - **Research**: 2 research threads complete in `docs/security-research/` — see `docs/security-research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
-- **Frontend**: Next.js minimal UI with risk grade (A-F) display
+- **Frontend**: Next.js redesigned UI — sticky header, OWASP coverage grid, severity bar, findings grouped by server with CWE/ATT&CK shown, CLI section
+- **CLI**: Go binary at `packages/cli/` — `mcpaudit scan <file>`, text/json/sarif/bom output, `--fail-on` for CI gating
 - **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
 - **OWASP coverage**: 10/10 MCP Top 10 categories
+- **Claude Desktop config path (Windows)**: `C:\Users\abhijit\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
 
 ## Project Structure
 ```
-apps/web/                  Next.js 15 frontend (minimal scan UI)
+apps/web/                  Next.js 15 frontend (redesigned — OWASP grid, severity bar, grouped findings)
+packages/cli/              Go CLI binary (mcpaudit) — thin HTTP client calling API
+  main.go                  Entrypoint
+  cmd/                     Cobra commands: scan, version
+  internal/client/         HTTP client wrapping /scan, /scan/sarif, /scan/bom
+  internal/output/         text (colored terminal) + json formatters
+  Makefile                 build / cross / test targets
+  go.mod, go.sum           Dependencies: cobra v1.8, fatih/color v1.17
 apps/api/                  FastAPI backend
   main.py                  API entrypoint — /scan, /scan/sarif, /scan/bom
   engine/
@@ -42,7 +51,7 @@ apps/api/                  FastAPI backend
     test_config_level.py   8 config-level checks tests
     test_new_checks.py     44 tests for SH-004/005, SC-005, AT-004, PE-005, CWE IDs
     test_approval_headers.py  approval-headers tests (new, unstaged)
-packages/cli/              Go CLI binary (NOT YET BUILT — Stage 2)
+packages/cli/              Go CLI binary (built — thin HTTP client, see offline note below)
 docs/
   vault/                   Obsidian workspace — personal notes, build logs (gitignored)
   product-research/        Pre-build strategy/competitive research markdown (gitignored)
@@ -58,10 +67,36 @@ docs/
 
 ## Key Architecture Decisions
 - **FastAPI over Node.js**: mcp-audit is Python-native; wrapping in Python avoids translation friction
-- **Custom engine first, tool wrappers later**: All 29 checks are proprietary; subprocess wrapping of mcp-audit/tooltrust planned for Stage 2
+- **Custom engine first, tool wrappers later**: All 51 checks are proprietary; subprocess wrapping of mcp-audit/tooltrust planned for Stage 2
 - **Engine in apps/api/engine/ (not packages/)**: Simpler imports for MVP; extract to packages/ in Stage 2
 - **SARIF output built-in**: Enables GitHub Security tab integration without extra tooling
 - **CycloneDX AI-BOM built-in**: Enables supply chain compliance workflows
+
+## CLI Offline Mode — Critical Roadmap Item
+**Current problem:** The CLI sends the user's config (which may contain secrets) to the remote API to run checks. For a security tool this is a trust contradiction — users are asked to send their AWS keys and DB passwords to a third-party server.
+
+**Industry standard:** Every major security CLI (Trivy, Grype, Gitleaks, Trufflehog, osv-scanner) runs fully offline. All written in Go. Single static binary, no network required, no data leaves the machine.
+
+**Target state:** Port the 51 Python checks to Go so the CLI runs entirely locally.
+```
+Current:  CLI (Go) → network → API (Python) → engine runs → results back
+Target:   CLI (Go) → engine runs locally → results  ← zero network, zero data sent
+```
+
+**Why Go (not TypeScript) for the engine port:**
+- Single static binary, no runtime dependency
+- Cross-compiles to linux/darwin/windows/arm64 trivially
+- Fast startup (<50ms vs Node's ~500ms) — matters for CI
+- Industry standard: Trivy, Grype, Nuclei, Gitleaks, Trufflehog, osv-scanner are all Go
+- TypeScript requires Node runtime — a supply chain risk ironic for a security tool
+
+**Migration path (Stage 2):**
+1. Port engine checks to Go in `packages/cli/internal/engine/`
+2. CLI detects no `--api-url` flag → runs local engine
+3. Keep Python API for the web UI (web users still send data, but add explicit privacy notice)
+4. Add `--offline` flag as explicit local-only mode
+
+**Web UI privacy note to add:** A one-liner under the textarea — "Your config is processed on our server and not stored. For sensitive configs, use the CLI which runs locally."
 
 ## Tech Stack
 | Layer | Technology |
@@ -70,7 +105,7 @@ docs/
 | Backend | FastAPI (Python 3.12) + Pydantic v2 + httpx |
 | Auth | Clerk (planned — Stage 2) |
 | Database | Supabase (planned — Stage 2) |
-| CLI | Go (planned — Stage 2) |
+| CLI | Go (built — thin HTTP client; offline engine port is Stage 2) |
 | CVE data | OSV.dev API (Google-maintained, no API key) |
 | SARIF | 2.1.0 spec — GitHub Security tab compatible |
 | AI-BOM | CycloneDX 1.6 |
@@ -88,6 +123,12 @@ uvicorn main:app --reload --port 8000
 # Frontend
 cd apps/web
 npm install && npm run dev   # → http://localhost:3000
+
+# CLI (Go — requires Go 1.22+, installed at C:\Users\abhijit\AppData\Local\go\bin\go.exe)
+cd packages/cli
+go build -ldflags="-X main.Version=0.1.0" -o bin/mcpaudit.exe .
+go test ./...
+./bin/mcpaudit.exe scan <config.json> --api-url http://localhost:8000
 ```
 
 ## Security Check IDs (51 total)
