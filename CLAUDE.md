@@ -3,12 +3,13 @@
 ## What This Is
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
-## Current State (2026-06-27)
-- **Engine**: 51 check IDs across 11 modules, 313/313 tests passing
+## Current State (2026-06-28)
+- **Engine (Python)**: 51 check IDs across 11 modules, 313/313 tests passing — powers web UI at mcpaudit.app
+- **Engine (Go)**: All 51 checks ported to Go at `packages/cli/internal/engine/` — 117/117 tests passing, fully offline
 - **Research**: 2 research threads complete in `docs/security-research/` — see `docs/security-research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js redesigned UI — sticky header, OWASP coverage grid, severity bar, findings grouped by server with CWE/ATT&CK shown, CLI section
-- **CLI**: Go binary at `packages/cli/` — `mcpaudit scan <file>`, text/json/sarif/bom output, `--fail-on` for CI gating
+- **CLI**: Go binary at `packages/cli/` — **offline by default** (zero data sent), `--api-url` opt-in for remote API, text/json/sarif/bom output, `--fail-on` for CI gating, `--no-network` for fully air-gapped use
 - **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
 - **OWASP coverage**: 10/10 MCP Top 10 categories
 - **Claude Desktop config path (Windows)**: `C:\Users\abhijit\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
@@ -16,13 +17,21 @@ A web SaaS that audits Model Context Protocol (MCP) server configurations for se
 ## Project Structure
 ```
 apps/web/                  Next.js 15 frontend (redesigned — OWASP grid, severity bar, grouped findings)
-packages/cli/              Go CLI binary (mcpaudit) — thin HTTP client calling API
+packages/cli/              Go CLI binary (mcpaudit) — OFFLINE by default, --api-url for remote
   main.go                  Entrypoint
   cmd/                     Cobra commands: scan, version
-  internal/client/         HTTP client wrapping /scan, /scan/sarif, /scan/bom
+  internal/client/         HTTP client wrapping /scan, /scan/sarif, /scan/bom (remote mode only)
   internal/output/         text (colored terminal) + json formatters
+  internal/engine/         Go offline engine — 51 checks, zero network by default
+    engine.go              Public API: Scan(), ScanToSARIF(), ScanToBOM()
+    scanner.go             Orchestrator + AT-001/005/006 + risk score + severity sort
+    sarif.go               SARIF 2.1.0 output formatter
+    cyclonedx.go           CycloneDX 1.6 AI-BOM output formatter
+    models/models.go       Finding, ScanResult, ScanSummary (json-tagged, matches Python API)
+    parser/parser.go       JSONC parser + MCPConfig extraction
+    checks/                11 check modules (51 checks total)
   Makefile                 build / cross / test targets
-  go.mod, go.sum           Dependencies: cobra v1.8, fatih/color v1.17
+  go.mod, go.sum           Dependencies: cobra v1.8, fatih/color v1.17, google/uuid v1.6
 apps/api/                  FastAPI backend
   main.py                  API entrypoint — /scan, /scan/sarif, /scan/bom
   engine/
