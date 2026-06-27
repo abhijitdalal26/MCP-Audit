@@ -5,7 +5,7 @@ A web SaaS that audits Model Context Protocol (MCP) server configurations for se
 
 ## Current State (2026-06-28)
 - **Engine (Python)**: 51 check IDs across 11 modules, 313/313 tests passing — powers web UI at mcpaudit.app
-- **Engine (Go)**: All 51 checks ported to Go at `packages/cli/internal/engine/` — 222/222 tests passing, fully offline
+- **Engine (Go)**: All 51 checks ported to Go at `packages/cli/internal/engine/` — 313/313 tests passing, fully offline
 - **Research**: 2 research threads complete in `docs/security-research/` — see `docs/security-research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js redesigned UI — sticky header, OWASP coverage grid, severity bar, findings grouped by server with CWE/ATT&CK shown, CLI section
