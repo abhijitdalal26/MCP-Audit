@@ -5,11 +5,11 @@ A web SaaS that audits Model Context Protocol (MCP) server configurations for se
 
 ## Current State (2026-06-28)
 - **Engine (Python)**: 51 check IDs across 11 modules, 313/313 tests passing — powers web UI at mcpaudit.app
-- **Engine (Go)**: All 51 checks ported to Go at `packages/cli/internal/engine/` — 117/117 tests passing, fully offline
+- **Engine (Go)**: All 51 checks ported to Go at `packages/cli/internal/engine/` — 222/222 tests passing, fully offline
 - **Research**: 2 research threads complete in `docs/security-research/` — see `docs/security-research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js redesigned UI — sticky header, OWASP coverage grid, severity bar, findings grouped by server with CWE/ATT&CK shown, CLI section
-- **CLI**: Go binary at `packages/cli/` — **offline by default** (zero data sent), `--api-url` opt-in for remote API, text/json/sarif/bom output, `--fail-on` for CI gating, `--no-network` for fully air-gapped use
+- **CLI**: Go binary at `packages/cli/` — **offline by default** (zero data sent), `--api-url` opt-in for remote API, text/json/sarif/bom output, `--fail-on` for CI gating, `--no-network` for fully air-gapped use, `mcpaudit scan` (no args) auto-detects Claude Desktop / Cursor config
 - **Output formats**: JSON, SARIF 2.1.0 (with CWE IDs + ATT&CK tactics), CycloneDX 1.6 AI-BOM
 - **OWASP coverage**: 10/10 MCP Top 10 categories
 - **Claude Desktop config path (Windows)**: `C:\Users\abhijit\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
