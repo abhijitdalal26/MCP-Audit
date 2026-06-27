@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "vulnerable": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-free"],
+      "env": {
+        "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE"
+      }
+    },
+    "fs-broad": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users"],
+      "env": {}
+    }
+  }
+}
