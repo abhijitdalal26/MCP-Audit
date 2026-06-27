@@ -45,9 +45,11 @@ var scanCmd = &cobra.Command{
 	Short: "Scan an MCP config file for security vulnerabilities",
 	Long: `Scan a claude_desktop_config.json or .cursor/mcp.json for security issues.
 By default the scan runs entirely offline — your config never leaves your machine.
+With no arguments, auto-detects your Claude Desktop or Cursor config.
 
 Examples:
-  mcpaudit scan ~/.claude/claude_desktop_config.json
+  mcpaudit scan                                # auto-detect config
+  mcpaudit scan ~/Library/.../claude_desktop_config.json
   mcpaudit scan mcp.json --format sarif > results.sarif
   mcpaudit scan mcp.json --fail-on high
   mcpaudit scan mcp.json --no-network          # skip OSV CVE lookup
@@ -70,9 +72,19 @@ func runScan(_ *cobra.Command, args []string) error {
 		configPath = "stdin"
 	} else {
 		if len(args) == 0 {
-			return fmt.Errorf("provide a config file path or use --stdin\n\nUsage: mcpaudit scan <file>")
+			// Auto-detect Claude Desktop / Cursor config
+			found := detectConfigs()
+			if len(found) == 0 {
+				return fmt.Errorf("no MCP config file found automatically\n\nProvide a path: mcpaudit scan <file>\n\nExpected locations:\n  macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json\n  Windows: %%APPDATA%%\\Claude\\claude_desktop_config.json\n  Linux:   ~/.config/claude/claude_desktop_config.json\n  Cursor:  ~/.cursor/mcp.json")
+			}
+			// Use the first found config (Claude Desktop takes priority over Cursor)
+			configPath = found[0].Path
+			if !flagNoColor {
+				fmt.Fprintf(os.Stderr, "Auto-detected %s config: %s\n", found[0].Source, configPath)
+			}
+		} else {
+			configPath = args[0]
 		}
-		configPath = args[0]
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return fmt.Errorf("read %q: %w", configPath, err)

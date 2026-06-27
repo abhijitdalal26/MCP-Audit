@@ -42,6 +42,10 @@ jobs:
 
           ls -lh dist/
 
+      - name: Generate checksums
+        working-directory: packages/cli/dist
+        run: sha256sum * > checksums.txt && cat checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -49,7 +53,9 @@ jobs:
           body: |
             ## MCPAudit CLI ${{ github.ref_name }}
 
-            Thin HTTP client for the MCPAudit API. Calls `https://api.mcpaudit.app` by default.
+            Scans MCP configs (`claude_desktop_config.json`, `.cursor/mcp.json`) for security vulnerabilities.
+            **Runs 100% offline by default — your config never leaves your machine.**
+            All 51 checks run locally. No API key required. No data sent anywhere.
 
             ### Install
 
@@ -68,12 +74,22 @@ jobs:
             curl -sSfL https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/mcpaudit-linux-amd64 -o /usr/local/bin/mcpaudit && chmod +x /usr/local/bin/mcpaudit
             ```
 
+            **Windows** — download `mcpaudit-windows-amd64.exe` from Assets below, rename to `mcpaudit.exe`, add to PATH.
+
             ### Usage
             ```
-            mcpaudit scan ~/.claude/claude_desktop_config.json
-            mcpaudit scan mcp.json --format sarif > results.sarif
-            mcpaudit scan mcp.json --fail-on high
+            mcpaudit scan                          # auto-detect Claude Desktop / Cursor config
+            mcpaudit scan path/to/mcp.json         # explicit file
+            mcpaudit scan mcp.json --format sarif  # SARIF for GitHub Security tab
+            mcpaudit scan mcp.json --fail-on high  # CI gate
+            mcpaudit scan mcp.json --no-network    # fully air-gapped (skip OSV CVE lookup)
             ```
-          files: packages/cli/dist/*
+
+            ### Verify checksums
+            ```bash
+            curl -sSfL https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/checksums.txt | sha256sum --check
+            ```
+          files: |
+            packages/cli/dist/*
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
