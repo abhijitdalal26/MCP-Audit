@@ -1,6 +1,6 @@
 # mcpaudit GitHub Action
 
-Scan MCP server configs for security vulnerabilities in CI. Implements all 51 checks across the OWASP MCP Top 10. **Runs 100% offline — your config never leaves your runner.**
+Scan MCP server configs for security vulnerabilities in CI. Implements all 54 checks across the OWASP MCP Top 10. **Runs 100% offline — your config never leaves your runner.**
 
 ## Quick Start
 
@@ -106,7 +106,7 @@ jobs:
 
 ## What Gets Checked
 
-All 51 checks across 10 OWASP MCP Top 10 categories:
+All 54 checks across 10 OWASP MCP Top 10 categories:
 
 | Category | Checks |
 |----------|--------|

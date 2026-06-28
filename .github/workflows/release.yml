@@ -55,7 +55,7 @@ jobs:
 
             Scans MCP configs (`claude_desktop_config.json`, `.cursor/mcp.json`) for security vulnerabilities against the OWASP MCP Top 10.
             **Runs 100% offline by default — your config never leaves your machine.**
-            All 51 checks, zero data sent, no API key required.
+            All 54 checks, zero data sent, no API key required.
 
             ### Install (macOS / Linux)
 

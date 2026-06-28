@@ -1,6 +1,6 @@
 # MCPAudit Check Reference
 
-All 51+ check IDs, their severity, OWASP category, CWE, and what they detect.
+All 54 check IDs, their severity, OWASP category, CWE, and what they detect.
 Used by the website results UI for labels and the CLI for text output.
 
 ## Secrets — SEC (secrets.py)
@@ -31,6 +31,7 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 | SC-004 | varies | MCP04 | CWE-1035 | Live OSV.dev CVE lookup — flags packages with known CVEs |
 | SC-005 | HIGH | MCP04 | CWE-829 | Direct VCS ref dependency (`github:user/repo`, `bitbucket:user/repo`, `gitlab:user/repo`) — bypasses npm registry entirely: no integrity hash, no audit trail, maintainer can force-push and silently change what runs next invocation. |
 | SC-008 | HIGH | MCP04 | CWE-494 | VCS URL install (`git+https://`, `git+ssh://`, `git+http://`) or tarball URL (`https://...tar.gz`, `https://...zip`) as package argument — bypasses registry integrity checks same as SC-005 but via URL syntax rather than shorthand. |
+| SC-009 | HIGH | MCP04 | CWE-494 | Local filesystem install via `file:` protocol or relative path (`./pkg`, `../pkg`) — loads an arbitrary local directory as an npm package with no registry, no integrity hash, and no CVE audit trail. If an attacker can write to that path, they control what runs. |
 | SC-006 | HIGH | MCP04 | CWE-1007 | Unicode homoglyph characters in package name (visual spoofing) |
 | SC-007 | HIGH | MCP04 | CWE-829 | Custom registry/index-url override (Birsan-style dependency confusion) |
 
@@ -49,6 +50,7 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 | PE-007 | CRITICAL | MCP02 | CWE-284 | Permission bypass flag: `--dangerously-skip-permissions` or similar |
 | PE-008 | HIGH | MCP02 | CWE-22 | Path traversal sequence (`..`) in server args |
 | PE-009 | HIGH | MCP02 | CWE-250 | Docker `--cap-add` with dangerous capability: `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `DAC_OVERRIDE`, `SYS_MODULE`, etc. |
+| PE-010 | CRITICAL/HIGH | MCP05 | CWE-427 | Dynamic linker injection via env var: `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` (CRITICAL — injects arbitrary shared library into every spawned process) or `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` (HIGH — attacker-controlled library search path). No legitimate MCP server requires these variables. |
 
 ---
 
@@ -138,8 +140,8 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 | MCP01 | Token Mismanagement & Secret Exposure | SEC-001–008, EC-001 |
 | MCP02 | Privilege Escalation via Scope Creep | PE-001–009, CL-001, CHAIN-001–003 |
 | MCP03 | Tool Poisoning | PI-001–005, SH-004, DX-001, CL-002 |
-| MCP04 | Supply Chain Attacks | SC-001–007, SEC-006, AT-001, AT-006, LF-001 |
-| MCP05 | Command Injection & Execution | PE-002, PE-005, EX-001–003 |
+| MCP04 | Supply Chain Attacks | SC-001–009, SEC-006, AT-001, AT-006, LF-001 |
+| MCP05 | Command Injection & Execution | PE-002, PE-005, PE-010, EX-001–003 |
 | MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
 | MCP07 | Insufficient Authentication | SH-002, SH-006, CL-003, CL-004 |
 | MCP08 | Lack of Audit and Telemetry | AT-001–006 |

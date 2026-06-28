@@ -4,8 +4,8 @@
 A web SaaS that audits Model Context Protocol (MCP) server configurations for security vulnerabilities. Users paste their `claude_desktop_config.json` or `.cursor/mcp.json` and receive a unified security report in under 30 seconds, with every finding mapped to the OWASP MCP Top 10.
 
 ## Current State (2026-06-28)
-- **Engine (Python)**: 51 check IDs across 11 modules, 313/313 tests passing — powers web UI at mcpaudit.app
-- **Engine (Go)**: All 52 checks ported to Go at `packages/cli/internal/engine/` — 337/337 tests passing, fully offline
+- **Engine (Python)**: 54 check IDs across 11 modules, 335/335 tests passing — powers web UI at mcpaudit.app
+- **Engine (Go)**: All 54 checks ported to Go at `packages/cli/internal/engine/` — all packages passing, fully offline
 - **Research**: 2 research threads complete in `docs/security-research/` — see `docs/security-research/RESEARCH_INDEX.md`
 - **API**: FastAPI with `/scan`, `/scan/sarif`, `/scan/bom` endpoints
 - **Frontend**: Next.js redesigned UI — sticky header, OWASP coverage grid, severity bar, findings grouped by server with CWE/ATT&CK shown, CLI section
