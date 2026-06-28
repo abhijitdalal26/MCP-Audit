@@ -547,3 +547,74 @@ class TestSEC003HttpBasicAuth:
         server = make_server(env={"URL": "${BASE_URL}"})
         findings = check_secrets(server)
         assert not any(f.check_id == "SEC-003" for f in findings)
+
+
+class TestSC008VCSUrlInstall:
+    """SC-008: git+https://, git+ssh://, tarball URL installs bypass registry integrity."""
+
+    def test_git_https_url_fires(self):
+        server = MCPServer(
+            name="giturl", command="npx",
+            args=["git+https://github.com/user/mcp-server.git"],
+        )
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-008" for f in findings), "want SC-008 for git+https://"
+
+    def test_git_ssh_url_fires(self):
+        server = MCPServer(
+            name="giturl", command="npx",
+            args=["git+ssh://git@github.com/user/mcp-server.git"],
+        )
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-008" for f in findings), "want SC-008 for git+ssh://"
+
+    def test_tarball_url_fires(self):
+        server = MCPServer(
+            name="tarball", command="npx",
+            args=["https://example.com/mcp-server-1.0.0.tar.gz"],
+        )
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-008" for f in findings), "want SC-008 for tarball URL"
+
+    def test_zip_url_fires(self):
+        server = MCPServer(
+            name="zipball", command="npx",
+            args=["https://example.com/release.zip"],
+        )
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-008" for f in findings), "want SC-008 for .zip URL"
+
+    def test_normal_package_no_fire(self):
+        server = MCPServer(
+            name="normal", command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem@1.2.3"],
+        )
+        findings = check_supply_chain(server)
+        assert not any(f.check_id == "SC-008" for f in findings)
+
+    def test_severity_high(self):
+        server = MCPServer(
+            name="giturl", command="npx",
+            args=["git+https://github.com/user/mcp-server.git"],
+        )
+        findings = check_supply_chain(server)
+        sc8 = [f for f in findings if f.check_id == "SC-008"]
+        assert sc8[0].severity == Severity.HIGH
+
+    def test_owasp_mcp04(self):
+        server = MCPServer(
+            name="giturl", command="npx",
+            args=["git+https://github.com/user/mcp-server.git"],
+        )
+        findings = check_supply_chain(server)
+        sc8 = [f for f in findings if f.check_id == "SC-008"]
+        assert sc8[0].owasp.value == "MCP04"
+
+    def test_cwe_494(self):
+        server = MCPServer(
+            name="giturl", command="npx",
+            args=["git+https://github.com/user/mcp-server.git"],
+        )
+        findings = check_supply_chain(server)
+        sc8 = [f for f in findings if f.check_id == "SC-008"]
+        assert sc8[0].cwe_id == "CWE-494"

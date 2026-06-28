@@ -257,6 +257,43 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
                 cwe_id="CWE-829",
             ))
 
+        # SC-008: VCS URL install — git+https://, git+ssh://, tarball URL
+        # Complements SC-005 (which catches github:/bitbucket:/gitlab: shorthands).
+        # These URL forms also bypass the npm registry with no integrity verification.
+        # Real attack: supply chain via compromised git remote; no registry audit trail.
+        _sc008_prefixes = ("git+https://", "git+ssh://", "git+http://")
+        _sc008_tarball = re.compile(r'^https?://.*\.(tar\.gz|tgz|zip|tar\.bz2)$', re.I)
+        if any(package.lower().startswith(p) for p in _sc008_prefixes) or _sc008_tarball.match(package):
+            if package.lower().startswith("git+"):
+                install_type = "VCS URL install"
+                detail_extra = "The remote git repository can be force-pushed at any time to deliver malicious code."
+            else:
+                install_type = "tarball URL install"
+                detail_extra = "The tarball URL can be replaced at any time and there is no checksum verification."
+            findings.append(Finding(
+                check_id="SC-008",
+                title=f"Registry bypass via {install_type}: `{package}`",
+                detail=(
+                    f"Server `{server.name}` installs package `{package}` via a direct {install_type} "
+                    "instead of the npm/PyPI registry. "
+                    "This bypasses all registry integrity checks, CVE auditing, and provenance verification. "
+                    f"{detail_extra} "
+                    "No legitimate MCP server requires a git URL or tarball install for production use."
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP04,
+                server_name=server.name,
+                remediation=(
+                    f"Replace `{package}` with the official published package version from npmjs.com or pypi.org. "
+                    "If the package is not published to a registry, treat it with extra scrutiny — "
+                    "review the source code, pin to a specific commit SHA, and consider publishing "
+                    "to a private registry with integrity verification."
+                ),
+                engine="custom",
+                attack_tactic="initial-access",
+                cwe_id="CWE-494",
+            ))
+
         # SC-006: Non-ASCII / homoglyph characters in package name (Research 1).
         # SH-004 checks for non-ASCII Unicode *letters* in server *names*.
         # SC-006 covers the args vector: the package name inside npx/uvx args.

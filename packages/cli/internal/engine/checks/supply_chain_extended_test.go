@@ -113,6 +113,48 @@ func TestCheckSupplyChain_SC006_HomoglyphNPM(t *testing.T) {
 	}
 }
 
+func TestCheckSupplyChain_SC008_GitHTTPS(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "giturl", Command: "npx",
+		Args: []string{"-y", "git+https://github.com/user/mcp-server.git"},
+	}
+	if !hasCheckID(CheckSupplyChain(s), "SC-008") {
+		t.Error("want SC-008 for git+https:// package URL")
+	}
+}
+
+func TestCheckSupplyChain_SC008_GitSSH(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "giturl", Command: "npx",
+		Args: []string{"-y", "git+ssh://git@github.com/user/mcp-server.git"},
+	}
+	if !hasCheckID(CheckSupplyChain(s), "SC-008") {
+		t.Error("want SC-008 for git+ssh:// package URL")
+	}
+}
+
+func TestCheckSupplyChain_SC008_TarballURL(t *testing.T) {
+	// npx accepts tarball URLs directly; the extractor returns the first non-flag arg
+	s := &parser.MCPServer{
+		Name: "tarball", Command: "npx",
+		Args: []string{"https://example.com/mcp-server-1.0.0.tar.gz"},
+	}
+	if !hasCheckID(CheckSupplyChain(s), "SC-008") {
+		t.Error("want SC-008 for tarball URL package")
+	}
+}
+
+func TestCheckSupplyChain_SC008_NoFire_NormalHTTPS(t *testing.T) {
+	// A normal https URL that is NOT a tarball should not fire SC-008
+	s := &parser.MCPServer{
+		Name: "srv", Command: "npx",
+		Args: []string{"-y", "@modelcontextprotocol/server-filesystem@1.2.3"},
+	}
+	if hasCheckID(CheckSupplyChain(s), "SC-008") {
+		t.Error("SC-008 should not fire for normal npm package with version pin")
+	}
+}
+
 func TestCheckSupplyChain_SC007_RegistryOverride(t *testing.T) {
 	s := &parser.MCPServer{
 		Name: "custom-reg", Command: "npx",

@@ -29,7 +29,8 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 | SC-002 | HIGH | MCP04 | CWE-829 | Typosquatting pattern in package name (misspelled `@modelcontextprotocol`, leet-speak, etc.) |
 | SC-003 | MEDIUM | MCP04 | CWE-1104 | Unverified npm scope (not in trusted scope list like @anthropic, @microsoft, etc.) |
 | SC-004 | varies | MCP04 | CWE-1035 | Live OSV.dev CVE lookup — flags packages with known CVEs |
-| SC-005 | MEDIUM | MCP04 | CWE-829 | `uv run --with <package>` installs arbitrary PyPI package at runtime |
+| SC-005 | HIGH | MCP04 | CWE-829 | Direct VCS ref dependency (`github:user/repo`, `bitbucket:user/repo`, `gitlab:user/repo`) — bypasses npm registry entirely: no integrity hash, no audit trail, maintainer can force-push and silently change what runs next invocation. |
+| SC-008 | HIGH | MCP04 | CWE-494 | VCS URL install (`git+https://`, `git+ssh://`, `git+http://`) or tarball URL (`https://...tar.gz`, `https://...zip`) as package argument — bypasses registry integrity checks same as SC-005 but via URL syntax rather than shorthand. |
 | SC-006 | HIGH | MCP04 | CWE-1007 | Unicode homoglyph characters in package name (visual spoofing) |
 | SC-007 | HIGH | MCP04 | CWE-829 | Custom registry/index-url override (Birsan-style dependency confusion) |
 

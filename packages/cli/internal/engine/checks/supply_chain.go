@@ -69,6 +69,9 @@ var trustedScopes = map[string]bool{
 	"@linear":               true,
 }
 
+// sc008TarballRE matches tarball/zip URLs used as npm/PyPI package arguments.
+var sc008TarballRE = regexp.MustCompile(`(?i)^https?://.*\.(tar\.gz|tgz|zip|tar\.bz2)$`)
+
 // typosquatPattern holds a string-based check (RE2 doesn't support lookaheads).
 type typosquatPattern struct {
 	// matchFn returns true if the package name matches this typosquat pattern.
@@ -266,6 +269,39 @@ func CheckSupplyChain(server *parser.MCPServer) []models.Finding {
 				})
 				break
 			}
+		}
+
+		// SC-008: VCS URL install (git+https://, git+ssh://) or tarball URL.
+		// Complements SC-005 (which catches github:/bitbucket:/gitlab: shorthands).
+		// These forms also bypass the registry with no integrity hash verification.
+		sc008Prefixes := []string{"git+https://", "git+ssh://", "git+http://"}
+		isSC008VCS := false
+		for _, pfx := range sc008Prefixes {
+			if strings.HasPrefix(lower, pfx) {
+				isSC008VCS = true
+				break
+			}
+		}
+		isSC008Tarball := sc008TarballRE.MatchString(pkg.Name)
+		if isSC008VCS || isSC008Tarball {
+			installType := "VCS URL install"
+			detailExtra := "The remote git repository can be force-pushed at any time to deliver malicious code."
+			if isSC008Tarball {
+				installType = "tarball URL install"
+				detailExtra = "The tarball URL can be replaced at any time and there is no checksum verification."
+			}
+			findings = append(findings, models.Finding{
+				CheckID:  "SC-008",
+				Title:    fmt.Sprintf("Registry bypass via %s: `%s`", installType, pkg.Name),
+				Detail:   fmt.Sprintf("Server `%s` installs `%s` via a direct %s instead of the npm/PyPI registry. This bypasses all registry integrity checks, CVE auditing, and provenance verification. %s No legitimate MCP server requires a git URL or tarball install for production use.", server.Name, pkg.Name, installType, detailExtra),
+				Severity: models.SeverityHigh,
+				OWASP:    models.MCP04,
+				ServerName: server.Name,
+				Remediation: fmt.Sprintf("Replace `%s` with the official published package version from npmjs.com or pypi.org. If the package is not published to a registry, review the source code, pin to a specific commit SHA, and consider publishing to a private registry with integrity verification.", pkg.Name),
+				Engine:       "custom",
+				AttackTactic: "initial-access",
+				CWEID:        "CWE-494",
+			})
 		}
 
 		// SC-006: Non-ASCII / homoglyph characters in package name
