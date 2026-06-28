@@ -112,10 +112,11 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 
 | ID | Severity | OWASP | CWE | What it detects |
 |----|----------|-------|-----|-----------------|
-| CL-001 | MEDIUM | MCP03 | CWE-1104 | Duplicate server names in config (tool name collision) |
-| CL-002 | INFO | MCP02 | — | Server with neither command nor URL (likely misconfigured) |
-| CL-003 | HIGH | MCP02 | CWE-284 | Cross-server scope escalation (server A has access server B's secrets) |
-| EC-001 | HIGH | MCP07 | CWE-284 | Security feature explicitly disabled (TLS bypass, auth disable flags) |
+| CL-001 | HIGH | MCP02 | CWE-441 | Confused deputy: single server combining broad filesystem access AND shell execution (or secrets AND shell). Neither permission is dangerous in isolation; together they enable silent file exfiltration. |
+| CL-002 | MEDIUM | MCP03 | CWE-290 | Duplicate server package: two servers run the exact same `command` + package, which may indicate a tool-shadowing attack where a malicious server intercepts calls from the legitimate one. |
+| CL-003 | HIGH | MCP07 | CWE-295 | Security feature explicitly disabled via env var: `NODE_TLS_REJECT_UNAUTHORIZED=0`, `DISABLE_AUTH=true`, `SKIP_TLS_VERIFY=true`, `SSL_VERIFY=false`, etc. |
+| CL-004 | CRITICAL/HIGH/MEDIUM | MCP07 | CWE-284 | `autoApprove` / `alwaysAllow` bypasses per-tool user confirmation. Wildcard (`*` or `true`) → critical. Partial list (≥5 tools) → high. Partial list (<5 tools) → medium. |
+| EC-001 | MEDIUM | MCP01 | CWE-532 | Debug logging enabled (`LOG_LEVEL=debug`, `VERBOSE=true`) AND hardcoded secrets present in the same server — debug logs often capture env vars and HTTP headers in plaintext. |
 
 ---
 
@@ -133,13 +134,13 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 
 | Category | Name | Checks that cover it |
 |----------|------|----------------------|
-| MCP01 | Token Mismanagement & Secret Exposure | SEC-001–008 |
-| MCP02 | Privilege Escalation via Scope Creep | PE-001–009, CL-003, CHAIN-001–003 |
-| MCP03 | Tool Poisoning | PI-001–005, SH-004, DX-001 |
+| MCP01 | Token Mismanagement & Secret Exposure | SEC-001–008, EC-001 |
+| MCP02 | Privilege Escalation via Scope Creep | PE-001–009, CL-001, CHAIN-001–003 |
+| MCP03 | Tool Poisoning | PI-001–005, SH-004, DX-001, CL-002 |
 | MCP04 | Supply Chain Attacks | SC-001–007, SEC-006, AT-001, AT-006, LF-001 |
 | MCP05 | Command Injection & Execution | PE-002, PE-005, EX-001–003 |
 | MCP06 | Prompt Injection via Contextual Payloads | PI-002–003, DX-001 |
-| MCP07 | Insufficient Authentication | SH-002, SH-006, EC-001 |
+| MCP07 | Insufficient Authentication | SH-002, SH-006, CL-003, CL-004 |
 | MCP08 | Lack of Audit and Telemetry | AT-001–006 |
 | MCP09 | Shadow MCP Servers | SH-001, SH-003, SH-005, SC-001–002 |
 | MCP10 | Context Injection & Over-Sharing | PE-004 |
