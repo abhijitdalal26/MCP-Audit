@@ -549,6 +549,102 @@ class TestSEC003HttpBasicAuth:
         assert not any(f.check_id == "SEC-003" for f in findings)
 
 
+class TestSC009LocalFilesystemInstall:
+    """SC-009: file: protocol and relative path installs bypass registry integrity."""
+
+    def test_file_protocol_fires(self):
+        server = MCPServer(name="local", command="npx", args=["file:../evil-package"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-009" for f in findings), "want SC-009 for file: protocol"
+
+    def test_relative_path_fires(self):
+        server = MCPServer(name="local", command="npx", args=["./my-server"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-009" for f in findings), "want SC-009 for relative path"
+
+    def test_parent_relative_path_fires(self):
+        server = MCPServer(name="local", command="npx", args=["../sibling-package"])
+        findings = check_supply_chain(server)
+        assert any(f.check_id == "SC-009" for f in findings), "want SC-009 for ../ path"
+
+    def test_normal_package_no_fire(self):
+        server = MCPServer(name="normal", command="npx",
+                           args=["-y", "@modelcontextprotocol/server-filesystem@1.2.3"])
+        findings = check_supply_chain(server)
+        assert not any(f.check_id == "SC-009" for f in findings)
+
+    def test_severity_high(self):
+        server = MCPServer(name="local", command="npx", args=["file:../evil"])
+        findings = check_supply_chain(server)
+        sc9 = [f for f in findings if f.check_id == "SC-009"]
+        assert sc9[0].severity == Severity.HIGH
+
+    def test_owasp_mcp04(self):
+        server = MCPServer(name="local", command="npx", args=["file:./local-pkg"])
+        findings = check_supply_chain(server)
+        sc9 = [f for f in findings if f.check_id == "SC-009"]
+        assert sc9[0].owasp.value == "MCP04"
+
+    def test_cwe_494(self):
+        server = MCPServer(name="local", command="npx", args=["file:./local-pkg"])
+        findings = check_supply_chain(server)
+        sc9 = [f for f in findings if f.check_id == "SC-009"]
+        assert sc9[0].cwe_id == "CWE-494"
+
+
+class TestPE010LinkerInjection:
+    """PE-010: LD_PRELOAD / DYLD_INSERT_LIBRARIES and library path overrides."""
+
+    def test_ld_preload_critical(self):
+        server = make_server(env={"LD_PRELOAD": "/tmp/evil.so"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe10 = [f for f in findings if f.check_id == "PE-010"]
+        assert len(pe10) == 1
+        assert pe10[0].severity == Severity.CRITICAL
+
+    def test_dyld_insert_libraries_critical(self):
+        server = make_server(env={"DYLD_INSERT_LIBRARIES": "/tmp/evil.dylib"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe10 = [f for f in findings if f.check_id == "PE-010"]
+        assert pe10[0].severity == Severity.CRITICAL
+
+    def test_ld_library_path_high(self):
+        server = make_server(env={"LD_LIBRARY_PATH": "/tmp:/lib"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe10 = [f for f in findings if f.check_id == "PE-010"]
+        assert pe10[0].severity == Severity.HIGH
+
+    def test_dyld_library_path_high(self):
+        server = make_server(env={"DYLD_LIBRARY_PATH": "/tmp"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe10 = [f for f in findings if f.check_id == "PE-010"]
+        assert pe10[0].severity == Severity.HIGH
+
+    def test_normal_env_no_fire(self):
+        server = make_server(env={"NODE_ENV": "production", "PORT": "3000"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        assert not any(f.check_id == "PE-010" for f in findings)
+
+    def test_owasp_mcp05(self):
+        server = make_server(env={"LD_PRELOAD": "/tmp/evil.so"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe10 = [f for f in findings if f.check_id == "PE-010"]
+        assert pe10[0].owasp.value == "MCP05"
+
+    def test_cwe_427(self):
+        server = make_server(env={"LD_PRELOAD": "/tmp/evil.so"})
+        from engine.checks.privilege import check_privilege
+        findings = check_privilege(server)
+        pe10 = [f for f in findings if f.check_id == "PE-010"]
+        assert pe10[0].cwe_id == "CWE-427"
+
+
 class TestSC008VCSUrlInstall:
     """SC-008: git+https://, git+ssh://, tarball URL installs bypass registry integrity."""
 

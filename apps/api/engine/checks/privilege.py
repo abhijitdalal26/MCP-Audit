@@ -476,4 +476,61 @@ def check_privilege(server: MCPServer) -> list[Finding]:
                         break  # One PE-009 per server
                 i += 1
 
+    # PE-010: LD_PRELOAD / DYLD_INSERT_LIBRARIES and library path overrides in env vars.
+    # These variables inject arbitrary shared libraries into every process spawned by the server.
+    # An attacker controlling the env value — or the file it points to — gets code execution.
+    # Legitimate MCP servers have no reason to override the dynamic linker search path.
+    _PE010_CRITICAL_VARS = frozenset({"ld_preload", "dyld_insert_libraries"})
+    _PE010_HIGH_VARS = frozenset({"ld_library_path", "dyld_library_path", "dyld_fallback_library_path"})
+    for key, value in server.env.items():
+        lower_key = key.lower()
+        if lower_key in _PE010_CRITICAL_VARS and value:
+            findings.append(Finding(
+                check_id="PE-010",
+                title=f"Code injection via `{key}` dynamic linker override in `{server.name}`",
+                detail=(
+                    f"Server `{server.name}` sets `{key}={value!r}`. "
+                    f"`{key}` causes the dynamic linker to inject the specified shared library "
+                    "into every process the server spawns, including its own runtime. "
+                    "An attacker who can control this value or the file it points to "
+                    "achieves arbitrary code execution with the MCP server's privileges. "
+                    "No legitimate MCP server requires this variable."
+                ),
+                severity=Severity.CRITICAL,
+                owasp=OWASPCategory.MCP05,
+                server_name=server.name,
+                remediation=(
+                    f"Remove `{key}` from this server's env block. "
+                    "If a native library dependency requires it, link statically "
+                    "or use a container with a fixed, read-only library path."
+                ),
+                engine="custom",
+                attack_tactic="privilege-escalation",
+                cwe_id="CWE-427",
+            ))
+            break
+        if lower_key in _PE010_HIGH_VARS and value:
+            findings.append(Finding(
+                check_id="PE-010",
+                title=f"Library search path override: `{key}` set in `{server.name}`",
+                detail=(
+                    f"Server `{server.name}` sets `{key}={value!r}`. "
+                    f"`{key}` prepends attacker-controlled directories to the linker search path. "
+                    "A malicious shared library in that directory can replace a legitimate "
+                    "system library at load time. If the path is world-writable (e.g., /tmp), "
+                    "this is a full privilege escalation primitive."
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP05,
+                server_name=server.name,
+                remediation=(
+                    f"Remove `{key}` from this server's env block. "
+                    "Ensure the server binary links against system libraries directly."
+                ),
+                engine="custom",
+                attack_tactic="privilege-escalation",
+                cwe_id="CWE-427",
+            ))
+            break
+
     return findings

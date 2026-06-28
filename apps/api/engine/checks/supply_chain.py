@@ -294,6 +294,44 @@ def check_supply_chain(server: MCPServer) -> list[Finding]:
                 cwe_id="CWE-494",
             ))
 
+        # SC-009: Local filesystem install via file: protocol or relative path.
+        # `npx file:../evil` or `npx ./local-pkg` loads an arbitrary local directory
+        # as an npm package — no registry lookup, no integrity hash, no audit trail.
+        # If an attacker can write to that path (e.g., /tmp, ../), they own the install.
+        # Also fires on Windows-style drive paths: C:\Users\...\evil-pkg
+        _sc009_file_prefixes = ("file:", "file://")
+        _sc009_rel_re = re.compile(r'^\.{1,2}[/\\]')  # ./ or ../ or .\ or ..\
+        _sc009_drive_re = re.compile(r'^[A-Za-z]:[/\\]')  # C:\ or D:/
+        if (
+            any(package.lower().startswith(p) for p in _sc009_file_prefixes)
+            or _sc009_rel_re.match(package)
+            or _sc009_drive_re.match(package)
+        ):
+            findings.append(Finding(
+                check_id="SC-009",
+                title=f"Registry bypass via local filesystem install: `{package}`",
+                detail=(
+                    f"Server `{server.name}` installs `{package}` from the local filesystem "
+                    "instead of the npm or PyPI registry. Local installs have no integrity "
+                    "hash, no CVE audit trail, and no provenance verification. "
+                    "If an attacker can write to the target path (common with /tmp, relative paths, "
+                    "or shared directories), they can replace the package with malicious code "
+                    "that runs on the next server invocation."
+                ),
+                severity=Severity.HIGH,
+                owasp=OWASPCategory.MCP04,
+                server_name=server.name,
+                remediation=(
+                    f"Publish `{package}` to the npm or PyPI registry and reference it by "
+                    "name and pinned version (e.g., `my-server@1.0.0`). "
+                    "If this is a local development install, ensure it is removed from the "
+                    "shared/committed config before deployment."
+                ),
+                engine="custom",
+                attack_tactic="initial-access",
+                cwe_id="CWE-494",
+            ))
+
         # SC-006: Non-ASCII / homoglyph characters in package name (Research 1).
         # SH-004 checks for non-ASCII Unicode *letters* in server *names*.
         # SC-006 covers the args vector: the package name inside npx/uvx args.

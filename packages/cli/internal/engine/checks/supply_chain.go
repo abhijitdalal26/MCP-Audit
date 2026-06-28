@@ -72,6 +72,12 @@ var trustedScopes = map[string]bool{
 // sc008TarballRE matches tarball/zip URLs used as npm/PyPI package arguments.
 var sc008TarballRE = regexp.MustCompile(`(?i)^https?://.*\.(tar\.gz|tgz|zip|tar\.bz2)$`)
 
+// sc009RelRE matches relative path installs: ./ ../ .\ ..\
+var sc009RelRE = regexp.MustCompile(`^\.{1,2}[/\\]`)
+
+// sc009DriveRE matches Windows absolute path installs: C:\ or D:/
+var sc009DriveRE = regexp.MustCompile(`^[A-Za-z]:[/\\]`)
+
 // typosquatPattern holds a string-based check (RE2 doesn't support lookaheads).
 type typosquatPattern struct {
 	// matchFn returns true if the package name matches this typosquat pattern.
@@ -298,6 +304,28 @@ func CheckSupplyChain(server *parser.MCPServer) []models.Finding {
 				OWASP:    models.MCP04,
 				ServerName: server.Name,
 				Remediation: fmt.Sprintf("Replace `%s` with the official published package version from npmjs.com or pypi.org. If the package is not published to a registry, review the source code, pin to a specific commit SHA, and consider publishing to a private registry with integrity verification.", pkg.Name),
+				Engine:       "custom",
+				AttackTactic: "initial-access",
+				CWEID:        "CWE-494",
+			})
+		}
+
+		// SC-009: Local filesystem install via file: protocol or relative/absolute path.
+		// `npx file:../evil` or `npx ./local-pkg` loads an arbitrary local directory —
+		// no registry, no integrity hash, no audit trail.
+		// If an attacker can write to that path (e.g., /tmp, ../), they control the install.
+		sc009FilePrefix := strings.HasPrefix(lower, "file:") || strings.HasPrefix(lower, "file://")
+		sc009Rel := sc009RelRE.MatchString(pkg.Name)
+		sc009Drive := sc009DriveRE.MatchString(pkg.Name)
+		if sc009FilePrefix || sc009Rel || sc009Drive {
+			findings = append(findings, models.Finding{
+				CheckID:  "SC-009",
+				Title:    fmt.Sprintf("Registry bypass via local filesystem install: `%s`", pkg.Name),
+				Detail:   fmt.Sprintf("Server `%s` installs `%s` from the local filesystem instead of the npm or PyPI registry. Local installs have no integrity hash, no CVE audit trail, and no provenance verification. If an attacker can write to the target path (e.g., /tmp or relative paths), they can replace the package with malicious code that runs on the next server invocation.", server.Name, pkg.Name),
+				Severity: models.SeverityHigh,
+				OWASP:    models.MCP04,
+				ServerName: server.Name,
+				Remediation: fmt.Sprintf("Publish `%s` to the npm or PyPI registry and reference it by name and pinned version. If this is a local development install, remove it from the shared/committed config before deployment.", pkg.Name),
 				Engine:       "custom",
 				AttackTactic: "initial-access",
 				CWEID:        "CWE-494",

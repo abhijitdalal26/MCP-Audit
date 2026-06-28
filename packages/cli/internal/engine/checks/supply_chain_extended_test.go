@@ -102,6 +102,37 @@ func TestCheckSupplyChain_SC005_GitLabRef(t *testing.T) {
 	}
 }
 
+func TestCheckSupplyChain_SC009_FileProtocol(t *testing.T) {
+	s := &parser.MCPServer{Name: "local", Command: "npx", Args: []string{"file:../evil-package"}}
+	if !hasCheckID(CheckSupplyChain(s), "SC-009") {
+		t.Error("want SC-009 for file: protocol install")
+	}
+}
+
+func TestCheckSupplyChain_SC009_RelativePath(t *testing.T) {
+	s := &parser.MCPServer{Name: "local", Command: "npx", Args: []string{"./my-server"}}
+	if !hasCheckID(CheckSupplyChain(s), "SC-009") {
+		t.Error("want SC-009 for relative path install")
+	}
+}
+
+func TestCheckSupplyChain_SC009_ParentPath(t *testing.T) {
+	s := &parser.MCPServer{Name: "local", Command: "npx", Args: []string{"../sibling-package"}}
+	if !hasCheckID(CheckSupplyChain(s), "SC-009") {
+		t.Error("want SC-009 for ../ path install")
+	}
+}
+
+func TestCheckSupplyChain_SC009_NoFire_NormalPackage(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "normal", Command: "npx",
+		Args: []string{"-y", "@modelcontextprotocol/server-filesystem@1.2.3"},
+	}
+	if hasCheckID(CheckSupplyChain(s), "SC-009") {
+		t.Error("SC-009 must not fire for normal npm package")
+	}
+}
+
 func TestCheckSupplyChain_SC006_HomoglyphNPM(t *testing.T) {
 	// Package name with Cyrillic character
 	s := &parser.MCPServer{

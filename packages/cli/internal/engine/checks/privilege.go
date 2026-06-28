@@ -398,5 +398,49 @@ func CheckPrivilege(server *parser.MCPServer) []models.Finding {
 		}
 	}
 
+	// PE-010: LD_PRELOAD / DYLD_INSERT_LIBRARIES and library path overrides in env vars.
+	// These variables inject arbitrary shared libraries into every process spawned by the server.
+	// LD_PRELOAD / DYLD_INSERT_LIBRARIES → CRITICAL (full code injection primitive)
+	// LD_LIBRARY_PATH / DYLD_LIBRARY_PATH → HIGH (attacker-controlled search path)
+	// Legitimate MCP servers have no reason to override the dynamic linker search path.
+	pe010Critical := map[string]bool{"ld_preload": true, "dyld_insert_libraries": true}
+	pe010High := map[string]bool{"ld_library_path": true, "dyld_library_path": true, "dyld_fallback_library_path": true}
+	for key, value := range server.Env {
+		if value == "" {
+			continue
+		}
+		lk := strings.ToLower(key)
+		if pe010Critical[lk] {
+			findings = append(findings, models.Finding{
+				CheckID:  "PE-010",
+				Title:    fmt.Sprintf("Code injection via `%s` dynamic linker override in `%s`", key, server.Name),
+				Detail:   fmt.Sprintf("Server `%s` sets `%s=%q`. `%s` causes the dynamic linker to inject the specified shared library into every process the server spawns. An attacker who controls this value or the file it points to achieves arbitrary code execution with the MCP server's privileges. No legitimate MCP server requires this variable.", server.Name, key, value, key),
+				Severity: models.SeverityCritical,
+				OWASP:    models.MCP05,
+				ServerName: server.Name,
+				Remediation: fmt.Sprintf("Remove `%s` from this server's env block. If a native library dependency requires it, link the library statically or use a container with a fixed, read-only library path.", key),
+				Engine:       "custom",
+				AttackTactic: "privilege-escalation",
+				CWEID:        "CWE-427",
+			})
+			break
+		}
+		if pe010High[lk] {
+			findings = append(findings, models.Finding{
+				CheckID:  "PE-010",
+				Title:    fmt.Sprintf("Library search path override: `%s` set in `%s`", key, server.Name),
+				Detail:   fmt.Sprintf("Server `%s` sets `%s=%q`. This prepends attacker-controlled directories to the linker search path. A malicious shared library in that directory can replace a legitimate system library at load time. If the path is world-writable (e.g., /tmp), this is a full privilege escalation primitive.", server.Name, key, value),
+				Severity: models.SeverityHigh,
+				OWASP:    models.MCP05,
+				ServerName: server.Name,
+				Remediation: fmt.Sprintf("Remove `%s` from this server's env block. Ensure the server binary links against system libraries directly.", key),
+				Engine:       "custom",
+				AttackTactic: "privilege-escalation",
+				CWEID:        "CWE-427",
+			})
+			break
+		}
+	}
+
 	return findings
 }

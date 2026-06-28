@@ -3,6 +3,7 @@ package checks
 import (
 	"testing"
 
+	"github.com/abhijitdalal26/MCP-Audit/cli/internal/engine/models"
 	"github.com/abhijitdalal26/MCP-Audit/cli/internal/engine/parser"
 )
 
@@ -186,4 +187,70 @@ func TestCheckPrivilege_PE006_SudoInArgs(t *testing.T) {
 	if !found {
 		t.Errorf("expected PE-006 for sudo in args, got: %v", findings)
 	}
+}
+
+func TestCheckPrivilege_PE010_LdPreload_Critical(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "evil", Command: "node", Args: []string{"server.js"},
+		Env: map[string]string{"LD_PRELOAD": "/tmp/evil.so"},
+	}
+	findings := CheckPrivilege(s)
+	pe10 := filterID(findings, "PE-010")
+	if len(pe10) == 0 {
+		t.Error("want PE-010 for LD_PRELOAD")
+	}
+	if pe10[0].Severity != "critical" {
+		t.Errorf("want critical, got %s", pe10[0].Severity)
+	}
+}
+
+func TestCheckPrivilege_PE010_DyldInsertLibraries_Critical(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "mac-evil", Command: "node", Args: []string{"server.js"},
+		Env: map[string]string{"DYLD_INSERT_LIBRARIES": "/tmp/evil.dylib"},
+	}
+	findings := CheckPrivilege(s)
+	pe10 := filterID(findings, "PE-010")
+	if len(pe10) == 0 {
+		t.Error("want PE-010 for DYLD_INSERT_LIBRARIES")
+	}
+	if pe10[0].Severity != "critical" {
+		t.Errorf("want critical, got %s", pe10[0].Severity)
+	}
+}
+
+func TestCheckPrivilege_PE010_LdLibraryPath_High(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "suspicious", Command: "node", Args: []string{"server.js"},
+		Env: map[string]string{"LD_LIBRARY_PATH": "/tmp:/lib"},
+	}
+	findings := CheckPrivilege(s)
+	pe10 := filterID(findings, "PE-010")
+	if len(pe10) == 0 {
+		t.Error("want PE-010 for LD_LIBRARY_PATH")
+	}
+	if pe10[0].Severity != "high" {
+		t.Errorf("want high, got %s", pe10[0].Severity)
+	}
+}
+
+func TestCheckPrivilege_PE010_NoFire_NormalEnv(t *testing.T) {
+	s := &parser.MCPServer{
+		Name: "normal", Command: "node", Args: []string{"server.js"},
+		Env: map[string]string{"NODE_ENV": "production", "PORT": "3000"},
+	}
+	findings := CheckPrivilege(s)
+	if len(filterID(findings, "PE-010")) > 0 {
+		t.Error("PE-010 must not fire for normal env vars")
+	}
+}
+
+func filterID(findings []models.Finding, id string) []models.Finding {
+	var out []models.Finding
+	for _, f := range findings {
+		if f.CheckID == id {
+			out = append(out, f)
+		}
+	}
+	return out
 }
