@@ -68,9 +68,9 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 
 | ID | Severity | OWASP | CWE | What it detects |
 |----|----------|-------|-----|-----------------|
-| EX-001 | HIGH | MCP05 | CWE-506 | base64-encoded command in args (obfuscated code execution) |
-| EX-002 | HIGH | MCP05 | CWE-78 | PowerShell encoded command (`-EncodedCommand` or `-enc`) |
-| EX-003 | HIGH | MCP05 | CWE-78 | `curl | bash` or `wget | sh` pipe pattern in args |
+| EX-001 | CRITICAL | MCP05 | CWE-78 | Inline code execution patterns in args: `python -c`, `node -e`, `eval()`, `exec()`, `subprocess.call()`, `os.system()`, `child_process`, `Runtime.getRuntime().exec()` |
+| EX-002 | HIGH | MCP05 | CWE-78 | Command substitution / shell injection syntax in args: `$()`, backticks, `{{}}` template injection, process substitution `<()`, chained shell commands (`;rm`, `;curl`), pipe-to-interpreter |
+| EX-003 | CRITICAL | MCP05 | CWE-116 | Three obfuscated execution patterns: (a) PowerShell `-EncodedCommand`/`-ec` flag followed by Base64 payload; (b) `curl`/`wget` piped to `bash`/`sh`/`python`; (c) `exec(base64.b64decode(...))` Python b64 decode-and-execute. All three decoded and previewed in finding. |
 
 ---
 
@@ -91,12 +91,12 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 
 | ID | Severity | OWASP | CWE | What it detects |
 |----|----------|-------|-----|-----------------|
-| AT-001 | MEDIUM | MCP08 | CWE-1104 | Zero version pinning across the entire config (systemic rug pull risk) |
-| AT-002 | INFO | MCP08 | — | No logging configured on any server |
-| AT-003 | INFO | MCP08 | — | Telemetry explicitly disabled |
-| AT-004 | INFO | MCP08 | — | Missing audit trail markers (no `--log-level`, `--audit`, etc.) |
-| AT-005 | INFO | MCP08 | — | Excessive server count (10+ servers — large unreviewed attack surface) |
-| AT-006 | MEDIUM | MCP04 | CWE-1104 | Docker image without pinned tag (`:latest`, no tag, or floating alias like `:stable`) |
+| AT-001 | MEDIUM | MCP08 | CWE-1104 | Zero version pinning across the entire config — ALL servers have unpinned packages (systemic rug pull / supply chain risk). Fires only when no server has any pinned package. |
+| AT-002 | LOW | MCP08 | CWE-16 | Transport ambiguity: server has BOTH `command` AND `url` fields declared. An MCP server uses one transport (stdio or HTTP/SSE), not both; this combination suggests misconfiguration or obfuscation. |
+| AT-003 | INFO | MCP08 | CWE-16 | Remote server URL without explicit `transport` declaration — MCP client must guess the protocol, which can lead to unexpected behavior. Exempt if `transport: sse/http/streamable-http/ws` is set. |
+| AT-004 | HIGH | MCP08 | CWE-668 | Server bound to all network interfaces (`0.0.0.0` or `[::]` in URL) — exposes MCP tools to the entire local network. NeighborJack pattern: any device on same WiFi can invoke tools without auth. |
+| AT-005 | INFO | MCP08 | — | Excessive server count (10+ servers) — large unreviewed attack surface; each server adds risk. |
+| AT-006 | MEDIUM | MCP04 | CWE-1104 | Docker image without pinned tag (`:latest`, no tag, or floating alias like `:stable`) — image may change without notice between invocations. |
 
 ---
 
