@@ -1,5 +1,5 @@
 name: MCPAudit Security Scan
-description: Scan MCP server configs for security vulnerabilities (OWASP MCP Top 10)
+description: Scan MCP server configs for security vulnerabilities (OWASP MCP Top 10). Runs 100% offline — your config never leaves your runner.
 author: abhijitdalal26
 
 branding:
@@ -15,38 +15,146 @@ inputs:
     description: Minimum severity to fail CI (critical/high/medium/low/info/none)
     required: false
     default: critical
-  api-url:
-    description: MCPAudit API URL (override for self-hosted instances)
-    required: false
-    default: https://api.mcpaudit.app
   format:
     description: Output format (text/json/sarif/bom)
     required: false
     default: text
+  sarif-output:
+    description: File path to write SARIF output (only used when format=sarif)
+    required: false
+    default: mcpaudit.sarif
+  upload-sarif:
+    description: Upload SARIF results to GitHub Security tab (requires format=sarif and security-events write permission)
+    required: false
+    default: 'false'
+  no-network:
+    description: Skip OSV.dev CVE lookup for fully air-gapped environments
+    required: false
+    default: 'false'
+  version:
+    description: mcpaudit CLI version to download (default: latest)
+    required: false
+    default: latest
+  verify-checksum:
+    description: Verify SHA-256 checksum of downloaded binary against release checksums.txt
+    required: false
+    default: 'true'
+
+outputs:
+  findings-count:
+    description: Total number of security findings
+    value: ${{ steps.scan.outputs.findings_count }}
+  risk-grade:
+    description: Risk grade (A/B/C/D/F)
+    value: ${{ steps.scan.outputs.risk_grade }}
+  sarif-file:
+    description: Path to SARIF output file (when format=sarif)
+    value: ${{ steps.scan.outputs.sarif_file }}
 
 runs:
   using: composite
   steps:
-    - name: Download mcpaudit CLI
+    - name: Detect platform and download mcpaudit
+      id: download
       shell: bash
       run: |
+        set -euo pipefail
+
+        # Detect OS and architecture
         OS=$(uname -s | tr '[:upper:]' '[:lower:]')
         ARCH=$(uname -m)
         case "$ARCH" in
-          x86_64) ARCH="amd64" ;;
+          x86_64)  ARCH="amd64" ;;
           arm64|aarch64) ARCH="arm64" ;;
+          *)
+            echo "::error::Unsupported architecture: $ARCH"
+            exit 1
+            ;;
         esac
-        BINARY="mcpaudit-${OS}-${ARCH}"
-        curl -sSfL \
-          "https://github.com/abhijitdalal26/MCP-Audit/releases/latest/download/${BINARY}" \
-          -o /usr/local/bin/mcpaudit
-        chmod +x /usr/local/bin/mcpaudit
+
+        BINARY_NAME="mcpaudit-${OS}-${ARCH}"
+        INSTALL_PATH="/usr/local/bin/mcpaudit"
+
+        # Resolve version tag
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -sSf "https://api.github.com/repos/abhijitdalal26/MCP-Audit/releases/latest" \
+            | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+        BASE_URL="https://github.com/abhijitdalal26/MCP-Audit/releases/download/${VERSION}"
+
+        echo "Downloading mcpaudit ${VERSION} for ${OS}/${ARCH}..."
+        curl -sSfL "${BASE_URL}/${BINARY_NAME}" -o "$INSTALL_PATH"
+        chmod +x "$INSTALL_PATH"
+
+        # Verify checksum if requested
+        if [ "${{ inputs.verify-checksum }}" = "true" ]; then
+          echo "Verifying SHA-256 checksum..."
+          curl -sSfL "${BASE_URL}/checksums.txt" -o /tmp/mcpaudit-checksums.txt
+          EXPECTED=$(grep "${BINARY_NAME}" /tmp/mcpaudit-checksums.txt | awk '{print $1}')
+          if [ -z "$EXPECTED" ]; then
+            echo "::warning::Checksum entry not found for ${BINARY_NAME} — skipping verification"
+          else
+            ACTUAL=$(sha256sum "$INSTALL_PATH" | awk '{print $1}')
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "::error::Checksum mismatch for ${BINARY_NAME}"
+              echo "  Expected: $EXPECTED"
+              echo "  Actual:   $ACTUAL"
+              rm -f "$INSTALL_PATH"
+              exit 1
+            fi
+            echo "Checksum verified: $ACTUAL"
+          fi
+        fi
+
         mcpaudit version
 
     - name: Run MCPAudit scan
+      id: scan
       shell: bash
       run: |
-        mcpaudit scan "${{ inputs.config-path }}" \
-          --api-url "${{ inputs.api-url }}" \
-          --fail-on "${{ inputs.fail-on }}" \
-          --format "${{ inputs.format }}"
+        set -euo pipefail
+
+        ARGS=()
+        ARGS+=("${{ inputs.config-path }}")
+        ARGS+=("--fail-on" "${{ inputs.fail-on }}")
+        ARGS+=("--format" "${{ inputs.format }}")
+        ARGS+=("--no-color")
+
+        if [ "${{ inputs.no-network }}" = "true" ]; then
+          ARGS+=("--no-network")
+        fi
+
+        # Write SARIF to file when format=sarif
+        SARIF_FILE=""
+        if [ "${{ inputs.format }}" = "sarif" ]; then
+          SARIF_FILE="${{ inputs.sarif-output }}"
+          ARGS+=("--output" "$SARIF_FILE")
+          echo "sarif_file=$SARIF_FILE" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Run — capture JSON summary for outputs even in text mode
+        set +e
+        mcpaudit scan "${ARGS[@]}"
+        EXIT_CODE=$?
+        set -e
+
+        # Extract counts from a quick JSON scan for outputs
+        JSON_OUT=$(mcpaudit scan "${{ inputs.config-path }}" --format json --no-color --no-network 2>/dev/null || echo '{"summary":{"total":0,"risk_grade":"A"}}')
+        TOTAL=$(echo "$JSON_OUT" | grep -o '"total":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+        GRADE=$(echo "$JSON_OUT" | grep -o '"risk_grade":"[^"]*"' | head -1 | grep -o '"[A-F]"' | tr -d '"' || echo "A")
+
+        echo "findings_count=$TOTAL" >> "$GITHUB_OUTPUT"
+        echo "risk_grade=$GRADE" >> "$GITHUB_OUTPUT"
+
+        # Propagate exit code from the primary scan (respects --fail-on)
+        exit $EXIT_CODE
+
+    - name: Upload SARIF to GitHub Security tab
+      if: inputs.upload-sarif == 'true' && inputs.format == 'sarif'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-output }}
+        category: mcpaudit

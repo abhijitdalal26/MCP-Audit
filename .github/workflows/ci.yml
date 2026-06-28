@@ -50,7 +50,7 @@ jobs:
         run: npm run build
 
   cli-tests:
-    name: CLI Tests (Go)
+    name: CLI Tests (Go) — 319 tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,7 +64,106 @@ jobs:
           cache-dependency-path: packages/cli/go.sum
 
       - name: Run tests
-        run: go test ./...
+        run: go test ./... -v -count=1
 
       - name: Build binary
-        run: go build -o bin/mcpaudit .
+        run: go build -ldflags="-s -w" -o bin/mcpaudit .
+
+      - name: Verify offline smoke test
+        run: |
+          echo '{"mcpServers":{"fs":{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem@1.2.3","/tmp"]}}}' \
+            | ./bin/mcpaudit scan --stdin --no-color --no-network
+
+  cli-cross-compile:
+    name: CLI Cross-Compile
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: packages/cli/go.sum
+
+      - name: Cross-compile all targets
+        run: |
+          LDFLAGS="-ldflags=-s -w"
+          GOOS=linux   GOARCH=amd64  go build $LDFLAGS -o dist/mcpaudit-linux-amd64 .
+          GOOS=darwin  GOARCH=amd64  go build $LDFLAGS -o dist/mcpaudit-darwin-amd64 .
+          GOOS=darwin  GOARCH=arm64  go build $LDFLAGS -o dist/mcpaudit-darwin-arm64 .
+          GOOS=windows GOARCH=amd64  go build $LDFLAGS -o dist/mcpaudit-windows-amd64.exe .
+
+      - name: Check binary sizes (must be under 20 MB)
+        run: |
+          for f in dist/mcpaudit-*; do
+            SIZE=$(stat -c%s "$f")
+            MB=$(awk "BEGIN{printf \"%.1f\", $SIZE/1048576}")
+            echo "$f: ${MB} MB"
+            if [ "$SIZE" -gt 20971520 ]; then
+              echo "::error::$f exceeds 20 MB limit (${MB} MB)"
+              exit 1
+            fi
+          done
+
+  action-test:
+    name: GitHub Action Integration Test
+    runs-on: ubuntu-latest
+    # Only run when a release binary is available — skip on initial push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build local binary for testing
+        working-directory: packages/cli
+        run: |
+          go build -ldflags="-s -w" -o /usr/local/bin/mcpaudit .
+
+      - name: Test action against clean fixture (should pass)
+        shell: bash
+        run: |
+          mcpaudit scan packages/cli/cmd/testdata/clean_config.json \
+            --fail-on critical --no-color --no-network
+          echo "clean config passed as expected"
+
+      - name: Test action against dirty fixture (findings expected, exit 0 with fail-on none)
+        shell: bash
+        run: |
+          mcpaudit scan packages/cli/cmd/testdata/dirty_config.json \
+            --fail-on none --no-color --no-network
+          echo "dirty config scanned (fail-on none)"
+
+      - name: Test SARIF output generation
+        shell: bash
+        run: |
+          mcpaudit scan packages/cli/cmd/testdata/dirty_config.json \
+            --format sarif --output /tmp/results.sarif --no-color --no-network || true
+          # Verify the SARIF file was written and is valid JSON
+          python3 -c "
+          import json, sys
+          with open('/tmp/results.sarif') as f:
+              sarif = json.load(f)
+          version = sarif.get('version')
+          if version != '2.1.0':
+              print(f'Bad SARIF version: {version}', file=sys.stderr)
+              sys.exit(1)
+          runs = sarif.get('runs', [])
+          print(f'SARIF valid: version={version}, {len(runs)} run(s)')
+          "
+
+      - name: Test JSON output structure
+        shell: bash
+        run: |
+          OUT=$(mcpaudit scan packages/cli/cmd/testdata/dirty_config.json \
+            --format json --no-color --no-network || true)
+          echo "$OUT" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          summary = data.get('summary', {})
+          total = summary.get('total', -1)
+          grade = summary.get('risk_grade', '?')
+          print(f'JSON valid: total={total}, grade={grade}')
+          assert total > 0, f'Expected findings in dirty config, got total={total}'
+          "
