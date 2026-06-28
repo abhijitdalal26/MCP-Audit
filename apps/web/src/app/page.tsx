@@ -324,6 +324,19 @@ export default function Home() {
               </button>
             )}
           </div>
+          <p className="text-xs text-gray-600">
+            Your config is processed on our server and not stored.{" "}
+            <span className="text-gray-500">
+              For configs containing secrets, use the{" "}
+              <a
+                href="#cli"
+                className="underline underline-offset-2 hover:text-gray-400 transition-colors"
+              >
+                CLI
+              </a>{" "}
+              — it runs all 51 checks locally with zero data sent.
+            </span>
+          </p>
         </div>
 
         {/* ── Error ── */}
@@ -610,12 +623,14 @@ export default function Home() {
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Use from the command line</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Single binary, no runtime required. Gate your CI pipeline on critical findings.
+              Single binary, no runtime required. Runs all 51 checks locally — your config never leaves your machine. Gate CI pipelines on critical findings.
             </p>
           </div>
           <div className="space-y-2">
             <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3.5 font-mono text-sm space-y-1.5">
-              <p className="text-gray-600"># Scan a config file</p>
+              <p className="text-gray-600"># Auto-detect Claude Desktop or Cursor config (zero data sent)</p>
+              <p className="text-gray-300">mcpaudit scan</p>
+              <p className="mt-2 text-gray-600"># Scan a specific config file</p>
               <p className="text-gray-300">mcpaudit scan ~/.claude/claude_desktop_config.json</p>
               <p className="mt-2 text-gray-600"># Output SARIF for the GitHub Security tab</p>
               <p className="text-gray-300">{"mcpaudit scan mcp.json --format sarif > results.sarif"}</p>
@@ -623,8 +638,8 @@ export default function Home() {
               <p className="text-gray-300">mcpaudit scan mcp.json --fail-on high</p>
             </div>
             <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3.5 font-mono text-sm space-y-1">
-              <p className="text-gray-600"># GitHub Actions</p>
-              <p className="text-gray-300">- uses: mcpaudit/action@v1</p>
+              <p className="text-gray-600"># GitHub Actions — runs offline on your runner</p>
+              <p className="text-gray-300">{"- uses: abhijitdalal26/MCP-Audit/.github/actions/mcpaudit@master"}</p>
               <p className="text-gray-300 pl-2">with:</p>
               <p className="text-gray-300 pl-4">config-path: .cursor/mcp.json</p>
               <p className="text-gray-300 pl-4">fail-on: high</p>
