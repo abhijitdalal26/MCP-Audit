@@ -627,6 +627,10 @@ export default function Home() {
             </p>
           </div>
           <div className="space-y-2">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3.5 font-mono text-sm space-y-1">
+              <p className="text-gray-600"># Install (macOS / Linux)</p>
+              <p className="text-gray-300">{"curl -sSfL https://raw.githubusercontent.com/abhijitdalal26/MCP-Audit/master/packages/cli/install.sh | bash"}</p>
+            </div>
             <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3.5 font-mono text-sm space-y-1.5">
               <p className="text-gray-600"># Auto-detect Claude Desktop or Cursor config (zero data sent)</p>
               <p className="text-gray-300">mcpaudit scan</p>
