@@ -78,12 +78,12 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 
 | ID | Severity | OWASP | CWE | What it detects |
 |----|----------|-------|-----|-----------------|
-| PI-001 | HIGH | MCP03 | CWE-77 | Prompt injection patterns in args (role override, ignore-previous-instructions, etc.) |
-| PI-002 | HIGH | MCP06 | CWE-116 | Invisible/zero-width Unicode characters in args (steganographic injection) |
-| PI-003 | HIGH | MCP06 | CWE-116 | Horizontal scroll exploit (very long lines hiding malicious instructions) |
-| PI-004 | HIGH | MCP03 | CWE-918 | Exfiltration webhook URL pattern in args |
-| PI-005 | HIGH | MCP03 | CWE-77 | Tool override pattern (attempts to redefine trusted tool behavior) |
-| DX-001 | HIGH | MCP06 | CWE-116 | Data exfiltration pattern in env var values |
+| PI-001 | HIGH | MCP03 | CWE-77 | Prompt injection keywords in args OR env vars: "ignore previous instructions", "override system prompt", "you are now", "developer mode", "DAN mode", LLM control tokens (`[INST]`, `<<SYS>>`, `<system>`), etc. |
+| PI-002 | MEDIUM | MCP06 | CWE-400 | Excessively long combined args (>2000 chars total) — may be hiding injected instructions or obfuscated payloads within what appears to be normal configuration. |
+| PI-003 | HIGH/MEDIUM | MCP03 | CWE-693 | Horizontal-scroll injection: single arg >300 chars on one line with no newlines. Content past the viewport is hidden in Claude Desktop / Cursor approval dialogs. Severity HIGH if injection keywords also present, MEDIUM otherwise. |
+| PI-004 | HIGH | MCP03 | CWE-116 | Obfuscation via escape sequences in args: 4+ consecutive `\uXXXX` unicode escapes or `\xXX` hex escapes. Classic payload obfuscation — `Ignore` decodes to "Ignore" but looks like gibberish in UI. |
+| PI-005 | HIGH/MEDIUM | MCP03 | CWE-116 | Invisible/zero-width/bidi-override Unicode steganography in args, env vars, OR server name. Detects Zero Width Space, ZWNJ, ZWJ, Soft Hyphen, Mongolian Vowel Separator, RTL Override (Trojan Source CVE-2021-42574), etc. Severity HIGH if bidi override present. |
+| DX-001 | HIGH | MCP03 | CWE-200 | Data exfiltration patterns in args OR env var values: "send data to", "POST to https://", webhook/callback URL references, "steal/harvest credentials", BCC/blind-copy rules, email forwarding rules (Postmark Sep 2025 incident). |
 
 ---
 
@@ -104,7 +104,7 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 
 | ID | Severity | OWASP | CWE | What it detects |
 |----|----------|-------|-----|-----------------|
-| LF-001 | HIGH | MCP04 | CWE-829 | Dangerous lifecycle script (`postinstall`, `preinstall`) in fetched package |
+| LF-001 | MEDIUM | MCP04 | CWE-912 | `npx -y <package>` without `--ignore-scripts` — npm will execute `preinstall`/`install`/`postinstall` scripts automatically on install. Static flag check: does not inspect the package itself, but flags the configuration that allows lifecycle scripts to run. Only fires when both `-y`/`--yes` flag is present AND `--ignore-scripts` is absent. |
 
 ---
 
@@ -139,7 +139,7 @@ Ignores placeholder values (`${VAR}`, `<your-key>`, `xxx`).
 | MCP03 | Tool Poisoning | PI-001–005, SH-004, DX-001, CL-002 |
 | MCP04 | Supply Chain Attacks | SC-001–007, SEC-006, AT-001, AT-006, LF-001 |
 | MCP05 | Command Injection & Execution | PE-002, PE-005, EX-001–003 |
-| MCP06 | Prompt Injection via Contextual Payloads | PI-002–003, DX-001 |
+| MCP06 | Prompt Injection via Contextual Payloads | PI-002 |
 | MCP07 | Insufficient Authentication | SH-002, SH-006, CL-003, CL-004 |
 | MCP08 | Lack of Audit and Telemetry | AT-001–006 |
 | MCP09 | Shadow MCP Servers | SH-001, SH-003, SH-005, SC-001–002 |
