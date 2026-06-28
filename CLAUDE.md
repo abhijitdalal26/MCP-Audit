@@ -22,14 +22,14 @@ packages/cli/              Go CLI binary (mcpaudit) — OFFLINE by default, --ap
   cmd/                     Cobra commands: scan, version
   internal/client/         HTTP client wrapping /scan, /scan/sarif, /scan/bom (remote mode only)
   internal/output/         text (colored terminal) + json formatters
-  internal/engine/         Go offline engine — 51 checks, zero network by default
+  internal/engine/         Go offline engine — 54 checks, zero network by default
     engine.go              Public API: Scan(), ScanToSARIF(), ScanToBOM()
     scanner.go             Orchestrator + AT-001/005/006 + risk score + severity sort
     sarif.go               SARIF 2.1.0 output formatter
     cyclonedx.go           CycloneDX 1.6 AI-BOM output formatter
     models/models.go       Finding, ScanResult, ScanSummary (json-tagged, matches Python API)
     parser/parser.go       JSONC parser + MCPConfig extraction
-    checks/                11 check modules (51 checks total)
+    checks/                11 check modules (54 checks total)
   Makefile                 build / cross / test targets
   go.mod, go.sum           Dependencies: cobra v1.8, fatih/color v1.17, google/uuid v1.6
 apps/api/                  FastAPI backend
@@ -42,9 +42,9 @@ apps/api/                  FastAPI backend
     cyclonedx.py           CycloneDX 1.6 AI-BOM output formatter
     checks/
       secrets.py           SEC-001–007 (includes HTTP basic auth + cloud metadata endpoint)
-      supply_chain.py      SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override)
+      supply_chain.py      SC-001–003, SC-005–009 (VCS refs, git+https://, file: installs, homoglyphs, registry override)
       tool_poisoning.py    PI-001–005, DX-001 (both scan args + env var values)
-      privilege.py         PE-001–008 (incl. sudo/elevated cmds, permission bypass, path traversal)
+      privilege.py         PE-001–010 (incl. sudo/elevated cmds, permission bypass, path traversal, LD_PRELOAD injection)
       shadow.py            SH-001–006 (incl. unauthenticated SSE endpoint)
       code_execution.py    EX-001–003 (+ PowerShell encoded cmd + curl|bash)
       osv_lookup.py        SC-004 (OSV.dev live CVE)
@@ -76,7 +76,7 @@ docs/
 
 ## Key Architecture Decisions
 - **FastAPI over Node.js**: mcp-audit is Python-native; wrapping in Python avoids translation friction
-- **Custom engine first, tool wrappers later**: All 51 checks are proprietary; subprocess wrapping of mcp-audit/tooltrust planned for Stage 2
+- **Custom engine first, tool wrappers later**: All 54 checks are proprietary; subprocess wrapping of mcp-audit/tooltrust planned for Stage 2
 - **Engine in apps/api/engine/ (not packages/)**: Simpler imports for MVP; extract to packages/ in Stage 2
 - **SARIF output built-in**: Enables GitHub Security tab integration without extra tooling
 - **CycloneDX AI-BOM built-in**: Enables supply chain compliance workflows
@@ -126,7 +126,7 @@ cd apps/api
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
 
-# Tests (313/313)
+# Tests (335/335)
 .venv/Scripts/pytest tests/ -v
 
 # Frontend
@@ -146,10 +146,10 @@ All checks mapped to OWASP MCP Top 10:
 | Module | IDs | OWASP |
 |---|---|---|
 | secrets.py | SEC-001–008 (incl. HTTP basic auth, IMDS endpoints, credentials in URL) | MCP01, MCP04 |
-| supply_chain.py | SC-001–003, SC-005–007 (uv run --with, homoglyphs, registry override) | MCP04 |
+| supply_chain.py | SC-001–003, SC-005–009 (VCS refs, git+https://, file: installs, homoglyphs, registry override) | MCP04 |
 | osv_lookup.py | SC-004 | MCP04 |
 | tool_poisoning.py | PI-001–005, DX-001 (incl. invisible Unicode, env var scan) | MCP03, MCP06 |
-| privilege.py | PE-001–009 (incl. path traversal, permission bypass, sudo, dangerous Docker caps) | MCP02, MCP05, MCP10 |
+| privilege.py | PE-001–010 (incl. path traversal, permission bypass, sudo, dangerous Docker caps, LD_PRELOAD) | MCP02, MCP05, MCP10 |
 | shadow.py | SH-001–006 (incl. unauthenticated SSE endpoint detection) | MCP03, MCP07, MCP09 |
 | code_execution.py | EX-001–003 (incl. PowerShell encoded cmd, curl|bash) | MCP05 |
 | audit.py | AT-002–004 | MCP08 |

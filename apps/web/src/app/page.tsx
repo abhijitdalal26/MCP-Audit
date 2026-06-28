@@ -277,7 +277,7 @@ export default function Home() {
             Find security issues in your MCP config
           </h1>
           <p className="mt-3 text-gray-400 leading-relaxed max-w-2xl">
-            51 checks across the OWASP MCP Top 10 — secrets, supply chain attacks, privilege
+            54 checks across the OWASP MCP Top 10 — secrets, supply chain attacks, privilege
             escalation, prompt injection, and more. Results in under 30 seconds. No account required.
           </p>
         </div>
@@ -334,7 +334,7 @@ export default function Home() {
               >
                 CLI
               </a>{" "}
-              — it runs all 51 checks locally with zero data sent.
+              — it runs all 54 checks locally with zero data sent.
             </span>
           </p>
         </div>
@@ -382,7 +382,7 @@ export default function Home() {
                     </p>
                     {result.summary.total === 0 ? (
                       <p className="text-green-400 text-sm font-medium">
-                        ✓ All 51 checks passed — no security issues found
+                        ✓ All 54 checks passed — no security issues found
                       </p>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
@@ -598,7 +598,7 @@ export default function Home() {
           <div>
             <h2 className="text-lg font-semibold text-gray-200">What does MCPAudit check?</h2>
             <p className="mt-1 text-sm text-gray-500">
-              51 checks across 11 categories, every finding mapped to the OWASP MCP Top 10.
+              54 checks across 11 categories, every finding mapped to the OWASP MCP Top 10.
             </p>
           </div>
           <div className="space-y-0">
@@ -623,7 +623,7 @@ export default function Home() {
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Use from the command line</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Single binary, no runtime required. Runs all 51 checks locally — your config never leaves your machine. Gate CI pipelines on critical findings.
+              Single binary, no runtime required. Runs all 54 checks locally — your config never leaves your machine. Gate CI pipelines on critical findings.
             </p>
           </div>
           <div className="space-y-2">
@@ -682,7 +682,7 @@ export default function Home() {
       {/* ── Footer ── */}
       <footer className="border-t border-gray-800 mt-4">
         <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between text-xs text-gray-700">
-          <span>MCPAudit · 51 checks · OWASP MCP Top 10</span>
+          <span>MCPAudit · 54 checks · OWASP MCP Top 10</span>
           <div className="flex items-center gap-4">
             <a
               href="https://github.com/abhijitdalal26/MCP-Audit"

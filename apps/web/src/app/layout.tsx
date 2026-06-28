@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MCPAudit — MCP Security Scanner",
     description:
-      "Paste your claude_desktop_config.json and get a full security audit in seconds. 51 checks, OWASP MCP Top 10, SARIF + AI-BOM output.",
+      "Paste your claude_desktop_config.json and get a full security audit in seconds. 54 checks, OWASP MCP Top 10, SARIF + AI-BOM output.",
     type: "website",
     url: "https://mcpaudit.app",
     siteName: "MCPAudit",
