@@ -72,6 +72,3 @@ htmlcov/
 # Build artifacts
 *.sarif
 dist/
-
-# Claude Desktop
-CLAUDE.md
